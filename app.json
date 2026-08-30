@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Storm-Path Mobile",
+    "slug": "storm-path-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "scheme": "stormpath",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "byte.dominiccalandro.stormpathmobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Storm-Path uses your location only as the live GPS fix that gates National Weather Service and NOAA radar requests.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Storm-Path uses foreground location as the live GPS fix for weather and radar. Background tracking is not required for the current AND-gate."
+      }
+    },
+    "android": {
+      "package": "byte.dominiccalandro.stormpathmobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0F14",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-status-bar",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Storm-Path uses your location only as the live GPS fix that gates National Weather Service and NOAA radar requests."
+        }
+      ]
+    ]
+  }
+}
