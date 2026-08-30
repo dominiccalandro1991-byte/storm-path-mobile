@@ -1,0 +1,62 @@
+# frozen_string_literal: true
+
+default_platform(:ios)
+
+ROOT = File.expand_path("..", __dir__)
+
+def require_env!(*keys)
+  missing = keys.select { |key| ENV[key].to_s.strip.empty? }
+  UI.user_error!("Missing required env: #{missing.join(', ')}") unless missing.empty?
+end
+
+def sh_root(cmd)
+  Dir.chdir(ROOT) { sh(cmd) }
+end
+
+desc "Typecheck the isolated mobile tree. Does not touch storm-path web."
+lane :typecheck do
+  sh_root("npx tsc --noEmit")
+end
+
+desc "Print hardware-validation matrix and confirm GPS-gate contract."
+lane :hardware_preflight do
+  typecheck
+  UI.message("Repo lock: dominiccalandro1991-byte/storm-path-mobile")
+  UI.message("Web core mutation: FORBIDDEN")
+  UI.message("GPS gate: first finite expo-location fix is the only NWS/WMS trigger")
+  UI.message("St. Louis coordinates are map-view only")
+  UI.message("Log filters: SP_HW BOOT | SP_HW PERM | SP_HW FIX | SP_HW NWS | SP_HW RADAR | SP_HW ILLEGAL_IO")
+end
+
+platform :ios do
+  desc "EAS production IPA then TestFlight submit"
+  lane :testflight_internal do
+    require_env!("EXPO_TOKEN", "APPLE_ID", "APPLE_TEAM_ID", "ASC_APP_ID")
+    hardware_preflight
+    sh_root("npx eas-cli build --platform ios --profile production --non-interactive --wait")
+    sh_root("npx eas-cli submit --platform ios --profile production --latest --non-interactive")
+  end
+
+  desc "Optional local gym path after expo prebuild (Apple silicon workstation)"
+  lane :gym_local do
+    require_env!("APPLE_TEAM_ID")
+    sh_root("npx expo prebuild --platform ios --no-install")
+    gym(
+      workspace: File.join(ROOT, "ios", "StormPathMobile.xcworkspace"),
+      scheme: "StormPathMobile",
+      export_method: "app-store",
+      output_directory: File.join(ROOT, "dist", "ios"),
+      clean: true
+    )
+  end
+end
+
+platform :android do
+  desc "EAS production AAB then Google Play Internal Testing (draft)"
+  lane :play_internal do
+    require_env!("EXPO_TOKEN")
+    hardware_preflight
+    sh_root("npx eas-cli build --platform android --profile production --non-interactive --wait")
+    sh_root("npx eas-cli submit --platform android --profile production --latest --non-interactive")
+  end
+end

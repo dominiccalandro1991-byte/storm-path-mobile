@@ -1,0 +1,10 @@
+report.xml
+Preview.html
+screenshots
+test_output
+*.env
+play-service-account.json
+AuthKey_*.p8
+*.mobileprovision
+*.cer
+*.certSigningRequest

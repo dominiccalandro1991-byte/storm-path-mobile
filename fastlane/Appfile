@@ -1,0 +1,10 @@
+# Credentials come from the environment. Never commit Apple or Play secrets.
+app_identifier("byte.dominiccalandro.stormpathmobile")
+apple_id(ENV["APPLE_ID"])
+team_id(ENV["APPLE_TEAM_ID"])
+itc_team_id(ENV["ITC_TEAM_ID"])
+
+for_platform :android do
+  package_name("byte.dominiccalandro.stormpathmobile")
+  json_key_file(ENV.fetch("GOOGLE_PLAY_JSON_KEY", "fastlane/play-service-account.json"))
+end

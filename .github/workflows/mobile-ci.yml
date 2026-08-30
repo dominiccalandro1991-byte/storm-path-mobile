@@ -1,0 +1,70 @@
+name: storm-path-mobile-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      eas_platform:
+        description: "Optional EAS production build platform"
+        required: false
+        default: "none"
+        type: choice
+        options:
+          - none
+          - ios
+          - android
+          - all
+
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - name: Isolation guard
+        run: |
+          test ! -f StormpathV1_3_5.html
+          test ! -f index.html
+          echo "storm-path web artifacts absent from mobile tree"
+
+  eas_production:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.eas_platform != 'none'
+    needs: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save eas-cli
+      - name: EAS production build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN secret is required for packaging"
+            exit 1
+          fi
+          PLATFORM="${{ github.event.inputs.eas_platform }}"
+          if [ "$PLATFORM" = "all" ]; then
+            npx eas-cli build --platform all --profile production --non-interactive --no-wait
+          else
+            npx eas-cli build --platform "$PLATFORM" --profile production --non-interactive --no-wait
+          fi
