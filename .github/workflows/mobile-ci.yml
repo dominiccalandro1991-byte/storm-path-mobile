@@ -30,12 +30,48 @@ jobs:
         working-directory: .
     steps:
       - uses: actions/checkout@v4
+      - name: Require compile tree
+        run: |
+          set -euo pipefail
+          test -f package.json
+          test -f tsconfig.json
+          test -f App.tsx
+          test -f index.ts
+          test -f src/core/spTypes.ts
+          test -f src/core/spStates.ts
+          test -f src/core/spSources.ts
+          test -f src/core/spConfidence.ts
+          test -f src/core/spAlerts.ts
+          test -f src/core/spRecompute.ts
+          test -f src/core/spScreens.ts
+          test -f src/core/spStartup.ts
+          test -f src/core/spGoldenChecks.ts
+          test -f src/core/spPersistence.ts
+          test -f src/diagnostics/spHardwareLog.ts
+          test -f src/location/spLocation.ts
+          test -f src/net/spNWS.ts
+          test -f src/net/spRadar.ts
+          test -f src/state/StormPathStore.tsx
+          test -f src/navigation/RootNavigator.tsx
+          test -f src/screens/DriverScreen.tsx
+          test -f src/screens/MapScreen.tsx
+          test -f src/screens/WeatherScreen.tsx
+          test -f src/screens/SettingsScreen.tsx
+          echo "compile tree present"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm
-      - run: npm ci
-      - run: npx tsc --noEmit
+          node-version: "22"
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "package-lock.json missing; using npm install"
+            npm install --no-audit --no-fund
+          fi
+      - run: npx tsc --noEmit --pretty false
       - name: Isolation guard
         run: |
           test ! -f StormpathV1_3_5.html
@@ -50,9 +86,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm
-      - run: npm ci
+          node-version: "22"
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
       - run: npm install --no-save eas-cli
       - name: EAS production build
         env:
