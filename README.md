@@ -8,11 +8,11 @@ This tree is **not** `dominiccalandro1991-byte/storm-path`. The web core is froz
 
 ## Test it on GitHub
 
-- **Live HUD:** [GitHub Pages](https://dominiccalandro1991-byte.github.io/storm-path-mobile/)
-- **CI:** Actions tab → `storm-path-mobile-ci` (typecheck + golden + vector score)
-- **Privacy:** [privacy.html](https://dominiccalandro1991-byte.github.io/storm-path-mobile/privacy.html)
+- **Live HUD (this commit, no install):** [jsDelivr HUD](https://cdn.jsdelivr.net/gh/dominiccalandro1991-byte/storm-path-mobile@main/docs/index.html)
+- **CI:** Actions tab → `storm-path-mobile-ci` → `engine` job (golden + vector score artifact)
+- **Privacy:** [docs/privacy.html](https://github.com/dominiccalandro1991-byte/storm-path-mobile/blob/main/docs/privacy.html)
 
-Browser geolocation on Pages is the GitHub test path. The App Store / Play binary uses device GNSS via `expo-location`.
+Allow location on the HUD. Device GNSS is the store binary via `expo-location`. GitHub Pages for this repo needs Settings → Pages → GitHub Actions once (the token in CI cannot create the Pages site).
 
 ## What it does
 
