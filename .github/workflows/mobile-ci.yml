@@ -34,9 +34,13 @@ jobs:
         run: |
           set -euo pipefail
           test -f package.json
+          test -f package-lock.json
           test -f tsconfig.json
           test -f App.tsx
           test -f index.ts
+          test -f scripts/run-golden.ts
+          test -f tsconfig.golden.json
+          test -f assets/icon.png
           test -f src/core/spTypes.ts
           test -f src/core/spStates.ts
           test -f src/core/spSources.ts
@@ -61,16 +65,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install dependencies
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit --pretty false
+      - name: Golden invariants
         run: |
           set -euo pipefail
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            echo "package-lock.json missing; using npm install"
-            npm install --no-audit --no-fund
-          fi
-      - run: npx tsc --noEmit --pretty false
+          npx tsc -p tsconfig.golden.json --pretty false
+          node .golden-out/scripts/run-golden.js
       - name: Isolation guard
         run: |
           test ! -f StormpathV1_3_5.html
@@ -86,14 +88,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install dependencies
-        run: |
-          set -euo pipefail
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install --no-audit --no-fund
-          fi
+          cache: npm
+      - run: npm ci
       - run: npm install --no-save eas-cli
       - name: EAS production build
         env:

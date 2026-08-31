@@ -18,5 +18,6 @@ yarn-error.*
 *.pem
 .env*.local
 *.tsbuildinfo
+.golden-out/
 /ios
 /android

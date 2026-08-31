@@ -26,6 +26,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "test:golden": "tsc -p tsconfig.golden.json --pretty false && node .golden-out/scripts/run-golden.js",
     "hardware-validate": "bash scripts/hardware-validate.sh",
     "eas:dev": "eas build --profile development",
     "eas:preview": "eas build --profile preview",

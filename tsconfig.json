@@ -15,7 +15,8 @@
     "App.tsx",
     "index.ts",
     "src/**/*.ts",
-    "src/**/*.tsx"
+    "src/**/*.tsx",
+    "scripts/**/*.ts"
   ],
   "exclude": [
     "node_modules",
