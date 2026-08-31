@@ -67,15 +67,7 @@ jobs:
           node-version: "22"
           cache: npm
       - name: Install dependencies
-        run: |
-          set -euo pipefail
-          npm config set fetch-retries 5
-          npm config set fetch-retry-mintimeout 20000
-          npm config set fetch-retry-maxtimeout 120000
-          if ! npm ci --no-audit --no-fund; then
-            echo "npm ci failed; falling back to npm install against the committed lockfile"
-            npm install --no-audit --no-fund
-          fi
+        run: npm install --no-audit --no-fund
       - run: npx tsc --noEmit --pretty false
       - name: Golden invariants
         run: |
@@ -99,11 +91,7 @@ jobs:
           node-version: "22"
           cache: npm
       - name: Install dependencies
-        run: |
-          set -euo pipefail
-          if ! npm ci --no-audit --no-fund; then
-            npm install --no-audit --no-fund
-          fi
+        run: npm install --no-audit --no-fund
       - run: npm install --no-save eas-cli
       - name: EAS production build
         env:
