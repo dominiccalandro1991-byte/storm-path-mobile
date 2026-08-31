@@ -1,6 +1,6 @@
 {
   "name": "storm-path-mobile",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -27,13 +27,14 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test:golden": "tsc -p tsconfig.golden.json --pretty false && node .golden-out/scripts/run-golden.js",
+    "test:vector": "tsc -p tsconfig.vector.json --pretty false && node .vector-out/scripts/run-vector-score.js",
     "hardware-validate": "bash scripts/hardware-validate.sh",
     "eas:dev": "eas build --profile development",
     "eas:preview": "eas build --profile preview",
-    "eas:prod": "eas build --profile production",
+    "eas:prod": "eas build --platform all --profile production",
     "submit:ios": "eas submit --platform ios --profile production --latest",
     "submit:android": "eas submit --platform android --profile production --latest"
   },
   "private": true,
-  "description": "Isolated native mobile port of Storm-Path. Zero mutation of storm-path web."
+  "description": "Storm Path native app. Isolated from dominiccalandro1991-byte/storm-path. Expo + TypeScript."
 }

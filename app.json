@@ -1,25 +1,49 @@
 {
   "expo": {
-    "name": "Storm-Path Mobile",
+    "name": "Storm Path",
     "slug": "storm-path-mobile",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "scheme": "stormpath",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#070B10"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "byte.dominiccalandro.stormpathmobile",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Storm-Path uses your location only as the live GPS fix that gates National Weather Service and NOAA radar requests.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Storm-Path uses foreground location as the live GPS fix for weather and radar. Background tracking is not required for the current AND-gate."
+        "NSLocationWhenInUseUsageDescription": "Storm Path uses your location only as the live GPS fix that gates National Weather Service and NOAA radar requests.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Storm Path uses foreground location as the live GPS fix for weather and radar. Background tracking is not required for the current AND-gate.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ],
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePreciseLocation",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          }
+        ]
       }
     },
     "android": {
       "package": "byte.dominiccalandro.stormpathmobile",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#0B0F14",
+        "backgroundColor": "#070B10",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -27,22 +51,24 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-status-bar",
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Storm-Path uses your location only as the live GPS fix that gates National Weather Service and NOAA radar requests."
+          "locationWhenInUsePermission": "Storm Path uses your location only as the live GPS fix that gates National Weather Service and NOAA radar requests."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "privacy": "https://dominiccalandro1991-byte.github.io/storm-path-mobile/privacy.html"
+    }
   }
 }

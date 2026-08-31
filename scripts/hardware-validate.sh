@@ -25,7 +25,8 @@ cat <<'EOF'
 HARDWARE VALIDATION MATRIX — storm-path-mobile
 Targets: physical iOS 17+ and Android 14+
 Exclusive I/O trigger: first finite expo-location fix
-St. Louis 38.627,-90.1994 is map-view only and MUST NOT appear in NWS/WMS URLs
+Murphysboro 37.7645,-89.3351 is map-view only and MUST NOT appear in NWS/WMS URLs
+unless that is the actual live GNSS fix.
 ================================================================================
 
 A. Install / launch
@@ -41,19 +42,17 @@ A. Install / launch
 B. Metro / device log filters
   iOS (macOS, device attached):
     npx expo start --ios
-    # or
-    log stream --predicate 'processImagePath CONTAINS "Expo" OR processImagePath CONTAINS "Storm"' --style compact | grep SP_HW
   Android 14+:
     adb logcat -s ReactNativeJS:V | grep SP_HW
 
 C. Required event order
-  1. SP_HW BOOT gps=false weatherIO=blocked radarIO=blocked
+  1. SP_HW BOOT gps=false weatherIO=blocked radarIO=blocked murphysboroViewOnly=true
   2. SP_HW PERM granted=true
   3. SP_HW FIX first=true lat=... lon=...     <-- only after a finite device fix
   4. SP_HW NWS legal=true url=https://api.weather.gov/points/<live-lat>,<live-lon>
   5. SP_HW RADAR legal=true url=...bbox= derived from the same live fix (2.5 deg span)
   FAIL if SP_HW ILLEGAL_IO appears.
-  FAIL if any weather.gov or opengeo URL contains 38.627 or -90.1994.
+  FAIL if any weather.gov or opengeo URL is issued before first=true.
   FAIL if NWS/RADAR logs appear before first=true.
 
 D. AND-gate after first fix
@@ -69,8 +68,5 @@ E. Negative tests
   Revoke location: SP_HW GPS_FAIL; no new NWS/WMS until another finite fix.
 
 F. Packaging after hardware PASS
-  bundle exec fastlane hardware_preflight
-  bundle exec fastlane ios testflight_internal
-  bundle exec fastlane android play_internal
-  # requires EXPO_TOKEN, APPLE_ID, APPLE_TEAM_ID, ASC_APP_ID, Play JSON key
+  See STORE.md. Requires EXPO_TOKEN, Apple, and Play accounts.
 EOF

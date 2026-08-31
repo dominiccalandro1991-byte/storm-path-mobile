@@ -113,18 +113,23 @@ export const SP_WEATHER_REFRESH_OK_MS = 5 * 60 * 1000;
 export const SP_NWS_ABORT_MS = 12_000;
 export const SP_RADAR_SPAN_DEG = 2.5;
 export const SP_RADAR_SIZE_PX = 512;
+
+/** Map-view default only. Never a legal NWS / NOAA trigger. */
 export const SP_MAP_VIEW_DEFAULT = {
-  latitude: 38.627,
-  longitude: -90.1994,
-  latitudeDelta: 0.35,
-  longitudeDelta: 0.35,
+  latitude: 37.7645,
+  longitude: -89.3351,
+  latitudeDelta: 0.08,
+  longitudeDelta: 0.08,
 } as const;
+export const SP_VIEW_ONLY_LABEL = 'Murphysboro, IL';
 
 export const SP_NWS_ORIGIN = 'https://api.weather.gov/';
 export const SP_NWS_USER_AGENT =
-  'StormPath-Mobile/0.1.0 (weather safety prototype; dominic.calandro1991@yahoo.com)';
+  'StormPath/1.0.0 (weather safety navigation; dominic.calandro1991@yahoo.com)';
 export const SP_RADAR_WMS_BASE =
   'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows';
+
+export const SP_APP_VERSION = '1.0.0';
 
 export function spIsPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

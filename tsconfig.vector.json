@@ -17,12 +17,12 @@
     "typeRoots": [],
     "noEmit": false,
     "rootDir": ".",
-    "outDir": ".golden-out",
+    "outDir": ".vector-out",
     "declaration": false,
     "sourceMap": false
   },
   "include": [
-    "scripts/run-golden.ts",
+    "scripts/run-vector-score.ts",
     "src/core/**/*.ts"
   ],
   "exclude": [
@@ -32,6 +32,7 @@
     "src/navigation",
     "src/net",
     "src/location",
-    "src/diagnostics"
+    "src/diagnostics",
+    "src/ui"
   ]
 }

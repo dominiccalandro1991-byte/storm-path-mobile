@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>STORMPATH</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root { --bg:#070B10; --raised:#10161D; --card:#121A22; --border:#1E2C3A; --text:#F4F7FB; --muted:#8AA0B8; --dim:#6F8296; --cyan:#00E5FF; --amber:#FFAB00; --green:#3DFF9A; --red:#FF3D5A; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family: Segoe UI, sans-serif; }
+    .app { display:flex; flex-direction:column; height:100%; }
+    .top { background:var(--raised); border-bottom:1px solid var(--border); padding:10px 12px 8px; }
+    .brand { display:flex; align-items:center; gap:8px; letter-spacing:2.4px; font-weight:800; font-size:13px; }
+    .mark { width:10px; height:10px; background:var(--cyan); border-radius:2px; }
+    .nav { display:flex; gap:6px; margin-top:8px; }
+    .nav button { flex:1; min-height:44px; background:transparent; color:var(--dim); border:1px solid var(--border); border-radius:6px; letter-spacing:1px; font-weight:700; font-size:11px; cursor:pointer; }
+    .nav button.active { color:var(--cyan); border-color:var(--cyan); }
+    .status { display:flex; gap:10px; margin-top:8px; font-size:10px; letter-spacing:.6px; color:var(--muted); flex-wrap:wrap; }
+    .dot { width:7px; height:7px; border-radius:4px; display:inline-block; margin-right:4px; }
+    .stage { flex:1; position:relative; overflow:auto; }
+    .screen { display:none; min-height:100%; }
+    .screen.active { display:block; }
+    .pad { padding:20px 16px 40px; }
+    #map { position:absolute; inset:0; }
+    .kicker { color:var(--cyan); letter-spacing:2px; font-size:11px; font-weight:700; }
+    .hero { font-size:32px; font-weight:800; margin:6px 0; }
+    .muted { color:var(--muted); }
+    .card { border:1px solid var(--border); background:var(--card); border-radius:12px; padding:14px; margin-top:12px; }
+    .btn { min-height:48px; border-radius:10px; border:0; font-weight:800; letter-spacing:1.2px; cursor:pointer; width:100%; margin-top:10px; }
+    .btn.primary { background:var(--cyan); color:#041016; }
+    .btn.ghost { background:transparent; color:var(--amber); border:1px solid var(--amber); }
+    .bottom { background:var(--raised); border-top:1px solid var(--border); padding:8px 12px 12px; font-size:11px; color:var(--muted); }
+    .fix { color:var(--cyan); font-family:"Courier New",monospace; font-size:10px; margin-top:4px; }
+    .search { position:absolute; left:12px; right:12px; bottom:16px; min-height:48px; background:rgba(7,11,16,.92); border:1px solid var(--cyan); color:var(--text); border-radius:12px; cursor:pointer; }
+    .sheet { display:none; position:absolute; inset:auto 0 0; background:var(--raised); border-top-left-radius:18px; border-top-right-radius:18px; padding:12px 16px 24px; z-index:20; max-height:86%; overflow:auto; }
+    .sheet.open { display:block; }
+    input { width:100%; min-height:48px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:0 12px; }
+    .hit { padding:12px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+    .toast { display:none; position:absolute; left:16px; right:16px; bottom:88px; background:#0C1C24; border:1px solid var(--cyan); color:var(--cyan); text-align:center; padding:10px; border-radius:8px; z-index:30; letter-spacing:1px; font-weight:700; font-size:12px; }
+    .toast.show { display:block; }
+    .grid { display:flex; flex-wrap:wrap; gap:10px; }
+    .chip { width:calc(50% - 5px); border:1px solid var(--border); border-radius:8px; padding:12px; }
+    .clock { display:flex; gap:8px; }
+    .cell { flex:1; border:1px solid var(--border); border-radius:8px; text-align:center; padding:10px 0; }
+    .cell b { display:block; font-size:22px; }
+    .cell span { color:var(--dim); font-size:10px; letter-spacing:1px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="top">
+      <div class="brand"><span class="mark"></span>STORMPATH <span id="clock" style="margin-left:auto;color:var(--cyan);font-family:Courier New,monospace;letter-spacing:0">--:--:--</span></div>
+      <div class="nav">
+        <button data-screen="driver">DRIVER</button>
+        <button data-screen="map" class="active">MAP</button>
+        <button data-screen="weather">WEATHER</button>
+        <button data-screen="settings">SETTINGS</button>
+      </div>
+      <div class="status">
+        <span><i class="dot" id="dGps"></i><span id="lGps">GPS WAIT</span></span>
+        <span><i class="dot" id="dWx"></i><span id="lWx">WX WAIT</span></span>
+        <span><i class="dot" id="dRadar"></i><span id="lRadar">RADAR WAIT</span></span>
+        <span id="badge" style="margin-left:auto;color:var(--amber)">AWAITING GPS FIX</span>
+      </div>
+    </div>
+    <div class="stage">
+      <section id="screen-driver" class="screen"><div class="pad">
+        <div class="kicker">DRIVER</div>
+        <div class="hero" id="drvState">SAFE MODE</div>
+        <div class="muted" id="drvConf">CONFIDENCE: N/A UNKNOWN</div>
+        <div class="card">
+          <div class="kicker" id="drvLive">READY</div>
+          <h2 style="margin:6px 0 8px">You're on the map</h2>
+          <p class="muted">This GitHub Pages HUD is the same Storm Path engine as the store app. Device GPS on a phone is the store binary. Here, browser geolocation is the live fix.</p>
+        </div>
+        <button class="btn primary" id="btnSearch">START DRIVE</button>
+        <div class="kicker" style="margin-top:18px">TIME TO ARRIVE</div>
+        <div class="clock" id="eta"><div class="cell"><b>0</b><span>DAYS</span></div><div class="cell"><b>0</b><span>HOURS</span></div><div class="cell"><b>0</b><span>MIN</span></div><div class="cell"><b>0</b><span>SEC</span></div></div>
+        <div class="card" id="nowCard"><b>↑</b> Set a destination to load the route</div>
+      </div></section>
+      <section id="screen-map" class="screen active"><div id="map"></div><button class="search" id="mapSearch">Town, state, or address</button></section>
+      <section id="screen-weather" class="screen"><div class="pad">
+        <div class="kicker">WEATHER</div>
+        <div class="hero" id="wxState">SAFE MODE</div>
+        <div class="kicker" style="margin-top:18px">RADAR</div>
+        <img id="radarImg" alt="radar" width="220" height="220" style="border-radius:110px;border:1px solid var(--border);display:none" />
+        <div class="kicker" style="margin-top:18px">CURRENT CONDITIONS</div>
+        <div class="grid" id="wxGrid"></div>
+        <div class="kicker" style="margin-top:18px">LIVE NWS ALERTS</div>
+        <div id="alerts" class="muted">AWAITING GPS FIX FOR LIVE NWS ALERTS</div>
+      </div></section>
+      <section id="screen-settings" class="screen"><div class="pad">
+        <div class="kicker">SETTINGS</div>
+        <div class="card"><b>AND-GATE</b><p class="muted" id="andGate">GPS=false WX=false RADAR=false</p></div>
+        <div class="card"><b>Storm Path 1.0.0</b><p class="muted">Navigation × weather. Live NWS. Live NOAA radar. Map view default is Murphysboro, Illinois — view only. First finite GPS fix is the only NWS / NOAA WMS trigger.</p><p><a href="privacy.html" style="color:var(--cyan)">Privacy policy</a></p></div>
+      </div></section>
+      <div class="sheet" id="sheet">
+        <div class="kicker">NAVIGATION</div>
+        <h3 style="margin:4px 0 12px">Set destination</h3>
+        <input id="q" placeholder="Town, state, or full US address" />
+        <div id="hits"></div>
+        <button class="btn ghost" id="closeSheet">CLOSE</button>
+      </div>
+      <div class="toast" id="toast"></div>
+    </div>
+    <div class="bottom"><div id="ticker">AWAITING A LIVE LOCATION FOR NWS ALERTS…</div><div class="fix" id="fix">ACQUIRING GPS FIX…</div></div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const VIEW = { lat: 37.7645, lon: -89.3351 };
+    const RANK = { normal:0, caution:1, danger:2, stop:3 };
+    function spComputeNextState(g, w, r, last) { return (g && w && r) ? (last || 'normal') : 'safe'; }
+    function classify(a) {
+      const e = (a.event||'').toLowerCase();
+      if ((e.includes('tornado warning') || a.severity==='Extreme') && a.urgency==='Immediate') return 'stop';
+      if (e.includes('tornado warning') || a.severity==='Extreme') return 'danger';
+      return 'caution';
+    }
+    function evaluate(list) {
+      if (!list || !list.length) return 'normal';
+      let worst = 'normal';
+      for (const a of list) { const c = classify(a); if (RANK[c] > RANK[worst]) worst = c; }
+      return worst;
+    }
+    const S = { screen:'map', gps:false, wx:false, radar:false, last:null, coords:null, dest:null, route:null, hourly:null, alerts:[], radarUrl:null };
+    const map = L.map('map', { zoomControl:false }).setView([VIEW.lat, VIEW.lon], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19, attribution:'OSM CARTO' }).addTo(map);
+    let marker = null, destMark = null, line = null, radarLayer = null;
+    function setDot(el, ok) { el.style.background = ok ? 'var(--green)' : 'var(--amber)'; }
+    function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2400); }
+    function paint() {
+      const state = spComputeNextState(S.gps, S.wx, S.radar, S.last);
+      const label = state === 'safe' ? 'SAFE MODE' : state.toUpperCase();
+      document.getElementById('drvState').textContent = label;
+      document.getElementById('wxState').textContent = label;
+      document.getElementById('drvLive').textContent = S.gps ? 'LIVE FIX' : 'READY';
+      document.getElementById('andGate').textContent = `GPS=${S.gps} WX=${S.wx} RADAR=${S.radar}`;
+      setDot(document.getElementById('dGps'), S.gps);
+      setDot(document.getElementById('dWx'), S.wx);
+      setDot(document.getElementById('dRadar'), S.radar);
+      document.getElementById('lGps').textContent = S.gps ? 'GPS LIVE' : 'GPS WAIT';
+      document.getElementById('lWx').textContent = S.wx ? 'WX LIVE' : 'WX WAIT';
+      document.getElementById('lRadar').textContent = S.radar ? 'RADAR LIVE' : 'RADAR WAIT';
+      const live = S.gps && S.wx && S.radar;
+      const badge = document.getElementById('badge');
+      badge.textContent = !S.gps ? 'AWAITING GPS FIX' : live ? 'WX + RADAR LIVE' : 'WX/RADAR WAIT · SAFE MODE';
+      badge.style.color = live ? 'var(--green)' : 'var(--amber)';
+      document.getElementById('ticker').textContent = !S.gps ? 'AWAITING A LIVE LOCATION FOR NWS ALERTS…' : (S.alerts[0] ? S.alerts.map(a=>a.event).join(' · ') : (S.wx ? 'NO ACTIVE NWS ALERTS AT THE LIVE FIX' : 'NWS WAIT'));
+      document.getElementById('fix').textContent = S.coords ? `${S.coords.lat.toFixed(4)}, ${S.coords.lon.toFixed(4)}` : 'ACQUIRING GPS FIX…';
+      const grid = document.getElementById('wxGrid');
+      const h = S.hourly || {};
+      grid.innerHTML = [['TEMP', h.temperature||'--'],['WIND', h.wind||'--'],['RH', h.humidity||'--'],['PRESSURE','N/A']].map(([k,v])=>`<div class="chip"><div class="muted">${k}</div><b>${v}</b></div>`).join('');
+      document.getElementById('alerts').textContent = !S.gps ? 'AWAITING GPS FIX FOR LIVE NWS ALERTS' : (S.alerts.length ? S.alerts.map(a=>`${a.event} · ${a.severity}`).join('\n') : 'No active alerts at the live fix');
+      const img = document.getElementById('radarImg');
+      if (S.radarUrl) { img.src = S.radarUrl; img.style.display='block'; } else img.style.display='none';
+      if (S.route) {
+        const sec = Math.round(S.route.min*60);
+        const cells = [Math.floor(sec/86400), Math.floor((sec%86400)/3600), Math.floor((sec%3600)/60), sec%60];
+        document.getElementById('eta').innerHTML = ['DAYS','HOURS','MIN','SEC'].map((l,i)=>`<div class="cell"><b>${cells[i]}</b><span>${l}</span></div>`).join('');
+        document.getElementById('nowCard').innerHTML = `<b>↑ ${S.route.miles.toFixed(1)} mi</b><div>${S.dest ? S.dest.label : ''}</div>`;
+      }
+    }
+    function switchScreen(name) {
+      if (!['driver','map','weather','settings'].includes(name) || S.screen===name) return;
+      S.screen = name;
+      document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active', el.id==='screen-'+name));
+      document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active', b.dataset.screen===name));
+      if (name==='map') setTimeout(()=>map.invalidateSize(), 50);
+    }
+    document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>switchScreen(b.dataset.screen));
+    function openSheet(){ document.getElementById('sheet').classList.add('open'); }
+    document.getElementById('btnSearch').onclick = openSheet;
+    document.getElementById('mapSearch').onclick = openSheet;
+    document.getElementById('closeSheet').onclick = ()=>document.getElementById('sheet').classList.remove('open');
+    let qTimer;
+    document.getElementById('q').addEventListener('input', (e)=>{
+      clearTimeout(qTimer);
+      qTimer = setTimeout(async ()=>{
+        const q = e.target.value.trim();
+        if (q.length<2) return;
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${(S.coords||VIEW).lat}&lon=${(S.coords||VIEW).lon}&limit=6&lang=en`;
+        const body = await fetch(url).then(r=>r.json()).catch(()=>null);
+        const hits = ((body&&body.features)||[]).map(f=>({
+          label: (f.properties&& (f.properties.name || 'Place')) + (f.properties.state ? ', '+f.properties.state : ''),
+          lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0]
+        }));
+        document.getElementById('hits').innerHTML = hits.map((h,i)=>`<div class="hit" data-i="${i}"><b>${h.label}</b></div>`).join('');
+        document.querySelectorAll('.hit').forEach(el=>el.onclick=()=>startDrive(hits[+el.dataset.i]));
+      }, 280);
+    });
+    async function startDrive(place) {
+      S.dest = place;
+      document.getElementById('sheet').classList.remove('open');
+      document.getElementById('mapSearch').textContent = place.label;
+      if (destMark) destMark.remove();
+      destMark = L.circleMarker([place.lat, place.lon], { radius:7, color:'#FFAB00', fillColor:'#FFAB00', fillOpacity:.9 }).addTo(map);
+      if (S.coords) {
+        const url = `https://router.project-osrm.org/route/v1/driving/${S.coords.lon},${S.coords.lat};${place.lon},${place.lat}?overview=full&geometries=geojson`;
+        const body = await fetch(url).then(r=>r.json()).catch(()=>null);
+        if (body && body.routes && body.routes[0]) {
+          const r = body.routes[0];
+          S.route = { miles: r.distance/1609.34, min: r.duration/60 };
+          if (line) line.remove();
+          line = L.geoJSON(r.geometry, { style:{ color:'#FFAB00', weight:4 } }).addTo(map);
+          map.fitBounds(line.getBounds(), { padding:[40,40] });
+        }
+      }
+      toast('DRIVE TO '+place.label.toUpperCase());
+      paint();
+    }
+    async function onFix(lat, lon) {
+      S.gps = true; S.coords = { lat, lon };
+      if (!marker) marker = L.circleMarker([lat,lon], { radius:8, color:'#00E5FF', fillColor:'#00E5FF', fillOpacity:.95 }).addTo(map);
+      else marker.setLatLng([lat,lon]);
+      map.setView([lat,lon], 14);
+      const point = lat.toFixed(4)+','+lon.toFixed(4);
+      try {
+        const pts = await fetch('https://api.weather.gov/points/'+point, { headers:{ Accept:'application/geo+json', 'User-Agent':'StormPath/1.0.0 (github pages hud)' } }).then(r=>r.json());
+        const p = pts.properties;
+        const hourlyUrl = `https://api.weather.gov/gridpoints/${p.gridId}/${p.gridX},${p.gridY}/forecast/hourly`;
+        const alertsUrl = `https://api.weather.gov/alerts/active?point=${point}`;
+        const [h, a] = await Promise.all([fetch(hourlyUrl,{headers:{Accept:'application/geo+json','User-Agent':'StormPath/1.0.0'}}).then(r=>r.json()), fetch(alertsUrl,{headers:{Accept:'application/geo+json','User-Agent':'StormPath/1.0.0'}}).then(r=>r.json())]);
+        const per = h.properties.periods[0];
+        S.hourly = { temperature: per.temperature+'°'+per.temperatureUnit, wind: (per.windDirection||'')+' '+(per.windSpeed||''), humidity: (per.relativeHumidity&&per.relativeHumidity.value!=null)? per.relativeHumidity.value+'%':'N/A' };
+        S.alerts = (a.features||[]).map(f=>({ event:f.properties.event, severity:f.properties.severity, urgency:f.properties.urgency }));
+        S.last = evaluate(S.alerts);
+        S.wx = true;
+      } catch { S.wx = false; }
+      const half = 1.25;
+      const bbox = `${lon-half},${lat-half},${lon+half},${lat+half}`;
+      const radar = `https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&version=1.1.1&request=GetMap&layers=conus_bref_qcd&format=image/png&transparent=true&srs=CRS:84&bbox=${bbox}&width=512&height=512`;
+      S.radarUrl = radar;
+      if (radarLayer) map.removeLayer(radarLayer);
+      radarLayer = L.imageOverlay(radar, [[lat-half,lon-half],[lat+half,lon+half]], { opacity:.55 }).addTo(map);
+      S.radar = true;
+      paint();
+    }
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(p=>onFix(p.coords.latitude, p.coords.longitude), ()=>paint(), { enableHighAccuracy:true, timeout:8000 });
+    }
+    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:false}); }, 1000);
+    paint();
+  </script>
+</body>
+</html>

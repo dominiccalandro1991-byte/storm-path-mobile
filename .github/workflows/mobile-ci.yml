@@ -39,28 +39,17 @@ jobs:
           test -f App.tsx
           test -f index.ts
           test -f scripts/run-golden.ts
+          test -f scripts/run-vector-score.ts
           test -f tsconfig.golden.json
+          test -f tsconfig.vector.json
           test -f assets/icon.png
           test -f src/core/spTypes.ts
           test -f src/core/spStates.ts
-          test -f src/core/spSources.ts
-          test -f src/core/spConfidence.ts
-          test -f src/core/spAlerts.ts
-          test -f src/core/spRecompute.ts
-          test -f src/core/spScreens.ts
-          test -f src/core/spStartup.ts
-          test -f src/core/spGoldenChecks.ts
-          test -f src/core/spPersistence.ts
-          test -f src/diagnostics/spHardwareLog.ts
-          test -f src/location/spLocation.ts
-          test -f src/net/spNWS.ts
-          test -f src/net/spRadar.ts
-          test -f src/state/StormPathStore.tsx
-          test -f src/navigation/RootNavigator.tsx
-          test -f src/screens/DriverScreen.tsx
-          test -f src/screens/MapScreen.tsx
-          test -f src/screens/WeatherScreen.tsx
-          test -f src/screens/SettingsScreen.tsx
+          test -f src/core/vectorScore.ts
+          test -f src/ui/Chrome.tsx
+          test -f src/ui/SearchSheet.tsx
+          test -f docs/index.html
+          test -f docs/privacy.html
           echo "compile tree present"
       - uses: actions/setup-node@v4
         with:
@@ -70,10 +59,15 @@ jobs:
         run: npm install --no-audit --no-fund
       - run: npx tsc --noEmit --pretty false
       - name: Golden invariants
-        run: |
-          set -euo pipefail
-          npx tsc -p tsconfig.golden.json --pretty false
-          node .golden-out/scripts/run-golden.js
+        run: npm run test:golden
+      - name: Vector score
+        run: npm run test:vector
+      - name: Upload vector score
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vector-score
+          path: vector-score.txt
       - name: Isolation guard
         run: |
           test ! -f StormpathV1_3_5.html

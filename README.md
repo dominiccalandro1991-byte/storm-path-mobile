@@ -1,45 +1,49 @@
-# Storm-Path Mobile
+# Storm Path
 
-Isolated React Native (Expo) port of Storm-Path.
+Native iOS / Android app for weather-aware navigation.
 
-This repository is **not** `dominiccalandro1991-byte/storm-path`. The web core is frozen. No file, commit, symlink, or workflow in this tree may mutate the web repository.
+Repository: [dominiccalandro1991-byte/storm-path-mobile](https://github.com/dominiccalandro1991-byte/storm-path-mobile)
 
-## Locked stack
+This tree is **not** `dominiccalandro1991-byte/storm-path`. The web core is frozen. No file in this repository may mutate the web repo.
 
-| Layer | Implementation |
+## Test it on GitHub
+
+- **Live HUD:** [GitHub Pages](https://dominiccalandro1991-byte.github.io/storm-path-mobile/)
+- **CI:** Actions tab → `storm-path-mobile-ci` (typecheck + golden + vector score)
+- **Privacy:** [privacy.html](https://dominiccalandro1991-byte.github.io/storm-path-mobile/privacy.html)
+
+Browser geolocation on Pages is the GitHub test path. The App Store / Play binary uses device GNSS via `expo-location`.
+
+## What it does
+
+DRIVER / MAP / WEATHER / SETTINGS. Search a US town or address, Start Drive, live NWS alerts, NOAA base-reflectivity radar.
+
+AND-gate:
+
+```
+nextState = (GPS && WX && RADAR) ? (lastAlert || normal) : safe
+```
+
+Map view default is Murphysboro, Illinois. That default is **view only**. First finite GPS fix is the only legal NWS / NOAA WMS trigger.
+
+## Store packaging
+
+| Field | Value |
 |---|---|
-| Language | TypeScript 5.x, `strict: true` |
-| Runtime | Expo SDK 57 / React Native 0.86 |
-| State | React Context SSOT (`StormPathProvider`) |
-| Map | `react-native-maps` + NOAA WMS `Overlay` |
-| Location | `expo-location` foreground high-accuracy |
-| Weather | `https://api.weather.gov/` only via `spNWSFetch` |
-| Radar | NOAA OpenGeo `conus_bref_qcd` GetMap CRS:84 |
-| Persistence | AsyncStorage + closed `SP_LS_SCHEMA` |
+| Version | 1.0.0 |
+| iOS bundle | `byte.dominiccalandro.stormpathmobile` |
+| Android package | `byte.dominiccalandro.stormpathmobile` |
+| Stack | Expo SDK 57 / RN 0.86 / TypeScript strict |
 
-## Immutable symbols (1:1 with Layer 1)
+Remaining human steps (Apple / Google / Expo accounts) are in `STORE.md`. Those cannot be completed from this repository alone.
 
-- `SP_STATES`, `spSetState`, `spValidateConfidence`, `spNormalizeSourceStatuses`
-- `switchScreen` / `SP_VALID_SCREENS` (boot screen `map`)
-- `spNWSFetch`, `spFetchWeather`, `spClassifyAlert`, `spEvaluateAlertState`, `spRecomputeState`
-
-## AND-gate
+## Verify locally
 
 ```
-nextState = (spGPSAvailable && spWeatherOK && spRadarOK)
-  ? (spLastAlertState || 'normal')
-  : 'safe'
+npm install --no-audit --no-fund
+npm run typecheck
+npm run test:golden
+npm run test:vector
 ```
 
-Alert-derived paint is illegal unless all three flags are true. Prototype-only sources cannot emit HIGH or MEDIUM.
-
-## Initialize on a workstation
-
-See `INIT-COMMANDS.md`. Do not run those commands against the web repository.
-
-## Honest non-goals
-
-- Pressure / visibility / CAPE from NWS hourly: missing by contract, chips stay `N/A`
-- Cached NWS rules for true `offline`: missing
-- Live DOT / emergency-management / road-closure / shelter feeds: stay prototype
-- Fastlane store deploy: later sprint
+Vector score must print `PASS` at ≥ 90%.

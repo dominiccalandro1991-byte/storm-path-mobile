@@ -43,7 +43,7 @@ export function spHwHasFiniteFix(): boolean {
 
 export function spHwMarkBoot(): void {
   state.bootMs = Date.now();
-  console.log(`SP_HW BOOT t=${stamp()} gps=false weatherIO=blocked radarIO=blocked stlViewOnly=true`);
+  console.log(`SP_HW BOOT t=${stamp()} gps=false weatherIO=blocked radarIO=blocked murphysboroViewOnly=true`);
 }
 
 export function spHwMarkPermission(granted: boolean): void {

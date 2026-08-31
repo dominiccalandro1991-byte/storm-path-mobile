@@ -2,19 +2,19 @@
 
 Run these on a machine with Node 20+ and a phone or emulator. Do **not** run them inside `dominiccalandro1991-byte/storm-path`.
 
-## 1. Clone the isolated repository
+## 1. Create the Expo TypeScript shell (if cloning an empty tree)
+
+```bash
+npx --yes create-expo-app@latest storm-path-mobile --template blank-typescript
+cd storm-path-mobile
+```
+
+If this repository is already cloned, skip `create-expo-app` and use the committed `App.tsx` / `src/` tree.
 
 ```bash
 git clone https://github.com/dominiccalandro1991-byte/storm-path-mobile.git
 cd storm-path-mobile
 npm install
-```
-
-If you need a fresh Expo shell instead of this tree:
-
-```bash
-npx --yes create-expo-app@latest storm-path-mobile --template blank-typescript
-cd storm-path-mobile
 ```
 
 ## 2. Install locked native dependencies (SDK 57 pins)

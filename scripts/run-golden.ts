@@ -10,7 +10,7 @@ declare const process: {
 import { runGoldenInvariantChecks } from '../src/core/spGoldenChecks';
 import { runStartupSafetyChecks } from '../src/core/spStartup';
 import { spComputeNextState } from '../src/core/spRecompute';
-import { SP_MAP_VIEW_DEFAULT } from '../src/core/spTypes';
+import { SP_MAP_VIEW_DEFAULT, SP_VIEW_ONLY_LABEL } from '../src/core/spTypes';
 
 const golden = runGoldenInvariantChecks();
 const startup = runStartupSafetyChecks({ mapLayoutOk: true });
@@ -20,8 +20,10 @@ const blocked = spComputeNextState({
   spRadarOK: false,
   spLastAlertState: 'stop',
 });
-const stlIsViewOnly =
-  SP_MAP_VIEW_DEFAULT.latitude === 38.627 && SP_MAP_VIEW_DEFAULT.longitude === -90.1994;
+const viewOnly =
+  SP_MAP_VIEW_DEFAULT.latitude === 37.7645 &&
+  SP_MAP_VIEW_DEFAULT.longitude === -89.3351 &&
+  SP_VIEW_ONLY_LABEL === 'Murphysboro, IL';
 
 const failures: string[] = [
   ...golden.map((code) => `GOLDEN_${code}`),
@@ -31,8 +33,8 @@ const failures: string[] = [
 if (blocked !== 'safe') {
   failures.push('AND_GATE_STOP_BLOCKED_SAFE');
 }
-if (!stlIsViewOnly) {
-  failures.push('STL_DEFAULT_DRIFT');
+if (!viewOnly) {
+  failures.push('VIEW_DEFAULT_NOT_MURPHYSBORO');
 }
 
 if (failures.length > 0) {
@@ -43,5 +45,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('SP_GOLDEN_OK codes=0 stlViewOnly=true andGateSafeOnRadarFail=true');
+console.log('SP_GOLDEN_OK codes=0 murphysboroViewOnly=true andGateSafeOnRadarFail=true');
 process.exit(0);

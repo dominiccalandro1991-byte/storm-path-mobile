@@ -4,6 +4,7 @@ import {
   SP_RADAR_WMS_BASE,
   spIsFiniteNumber,
 } from '../core/spTypes';
+import { spHwAssertIo } from '../diagnostics/spHardwareLog';
 
 export type RadarBounds = {
   minLon: number;
@@ -25,6 +26,9 @@ export function radarBoundsFromFix(lat: number, lon: number): RadarBounds | null
   };
 }
 
+/**
+ * NOAA OpenGeo WMS GetMap. CRS:84 lon,lat axis order. Finite bbox required.
+ */
 export function buildRadarWmsUrl(bounds: RadarBounds): string | null {
   const { minLon, minLat, maxLon, maxLat } = bounds;
   if (
@@ -53,6 +57,7 @@ export function buildRadarWmsUrl(bounds: RadarBounds): string | null {
 
 export async function probeRadarDecode(url: string): Promise<boolean> {
   try {
+    spHwAssertIo('RADAR', url);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12_000);
     const response = await fetch(url, { method: 'GET', signal: controller.signal });
@@ -67,7 +72,10 @@ export async function probeRadarDecode(url: string): Promise<boolean> {
     }
     const buf = await response.arrayBuffer();
     return buf.byteLength > 32;
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'SP_HW_IO_BEFORE_FINITE_FIX') {
+      throw error;
+    }
     return false;
   }
 }
