@@ -80,9 +80,12 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
           set -euo pipefail
-          # tsc does not need native postinstall (Skia/maps). Those hang npm 10 on GHA.
-          npm ci --ignore-scripts --no-audit --no-fund
-      - run: npx tsc --noEmit --pretty false
+          npm ci --ignore-scripts --include=dev --no-audit --no-fund
+      - name: Typecheck
+        run: |
+          set -euo pipefail
+          test -f node_modules/typescript/bin/tsc
+          node node_modules/typescript/bin/tsc --noEmit --pretty false
 
   eas_production:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.eas_platform != 'none'
@@ -100,7 +103,7 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
           set -euo pipefail
-          npm ci --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --include=dev --no-audit --no-fund
       - run: npm install --no-save eas-cli
       - name: EAS production build
         env:
