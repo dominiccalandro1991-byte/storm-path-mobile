@@ -80,12 +80,13 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
           set -euo pipefail
-          npm ci --ignore-scripts --include=dev --no-audit --no-fund
+          npm config set registry https://registry.npmjs.org/
+          npm ci --ignore-scripts --include=dev --no-audit --no-fund --registry https://registry.npmjs.org/
       - name: Typecheck
         run: |
           set -euo pipefail
           test -f node_modules/typescript/bin/tsc
-          node node_modules/typescript/bin/tsc --noEmit --pretty false
+          npm run typecheck -- --pretty false
 
   eas_production:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.eas_platform != 'none'
@@ -103,8 +104,9 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
           set -euo pipefail
-          npm ci --ignore-scripts --include=dev --no-audit --no-fund
-      - run: npm install --no-save eas-cli
+          npm config set registry https://registry.npmjs.org/
+          npm ci --ignore-scripts --include=dev --no-audit --no-fund --registry https://registry.npmjs.org/
+      - run: npm install --no-save eas-cli --registry https://registry.npmjs.org/
       - name: EAS production build
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
