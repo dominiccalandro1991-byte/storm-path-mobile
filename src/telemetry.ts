@@ -1,9 +1,11 @@
 const EVENTS_URL = "https://core-api.dominic-calandro1991.workers.dev/api/v1/events";
 const SOURCE = "storm-path-mobile";
 
+type Severity = "info" | "error";
+
 export function emitVoltcore(
   type: string,
-  severity: "info" | "error" | "low" | "medium" | "high" | "critical",
+  severity: Severity,
   payload: Record<string, unknown> = {}
 ): void {
   try {
@@ -11,7 +13,7 @@ export function emitVoltcore(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: SOURCE, type, severity, payload }),
-    }).catch(() => {});
+    }).catch(() => undefined);
   } catch {
     /* never throw from telemetry */
   }
@@ -36,13 +38,6 @@ export function installVoltcoreTelemetry(): void {
         fatal: Boolean(isFatal),
       });
       if (prev) prev(error, isFatal);
-    });
-  }
-
-  if (typeof g.addEventListener === "function") {
-    g.addEventListener("unhandledrejection", (event: Event) => {
-      const reason = (event as PromiseRejectionEvent).reason;
-      emitVoltcore("runtime.error", "error", { reason: String(reason ?? "") });
     });
   }
 }
