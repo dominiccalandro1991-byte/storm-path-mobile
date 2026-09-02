@@ -41,7 +41,7 @@ jobs:
           test ! -f index.html
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
       - name: Install TypeScript only
         run: npm install --no-audit --no-fund --no-package-lock typescript@6.0.3
       - name: Golden invariants
@@ -73,14 +73,15 @@ jobs:
           test -f src/ui/SearchSheet.tsx
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
           cache: npm
       - name: Install dependencies
         env:
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
           set -euo pipefail
-          npm ci --no-audit --no-fund
+          # tsc does not need native postinstall (Skia/maps). Those hang npm 10 on GHA.
+          npm ci --ignore-scripts --no-audit --no-fund
       - run: npx tsc --noEmit --pretty false
 
   eas_production:
@@ -92,14 +93,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
           cache: npm
       - name: Install dependencies
         env:
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
           set -euo pipefail
-          npm ci --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
       - run: npm install --no-save eas-cli
       - name: EAS production build
         env:
