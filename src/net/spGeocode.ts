@@ -1,3 +1,4 @@
+import { fromArcgisBody, fromCensusBody, spMergeGeoHits, type SpGeoHit } from '../core/spGeoParse';
 import { SP_MAP_VIEW_DEFAULT, spIsFiniteNumber, spIsPlainObject } from '../core/spTypes';
 
 export type SpPlace = {
@@ -19,6 +20,8 @@ export type SpRoute = {
 const SP_PHOTON = 'https://photon.komoot.io/api/';
 const SP_NOMINATIM = 'https://nominatim.openstreetmap.org/search';
 const SP_OPENMETEO = 'https://geocoding-api.open-meteo.com/v1/search';
+const SP_CENSUS = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress';
+const SP_ARCGIS = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates';
 const SP_OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
 export const CHIP_QUERIES: Record<string, string> = {
@@ -51,15 +54,6 @@ function isUsCountry(country: string): boolean {
     return true;
   }
   return c === 'US' || c === 'USA' || c === 'UNITED STATES' || c.indexOf('UNITED STATES') >= 0;
-}
-
-function pushUnique(out: SpPlace[], place: SpPlace): void {
-  const dup = out.some(
-    (p) => Math.abs(p.latitude - place.latitude) < 0.0003 && Math.abs(p.longitude - place.longitude) < 0.0003,
-  );
-  if (!dup) {
-    out.push(place);
-  }
 }
 
 async function fetchJson(url: string, headers: Record<string, string>, ms: number): Promise<unknown> {
@@ -164,30 +158,45 @@ function fromOpenMeteo(body: unknown): SpPlace[] {
   return out;
 }
 
+function toPlace(hit: SpGeoHit): SpPlace {
+  return { label: hit.label, sub: hit.sub, latitude: hit.latitude, longitude: hit.longitude };
+}
+
 export async function searchPlaces(query: string, bias?: SpGeoBias | null): Promise<SpPlace[]> {
   const q = query.trim();
   if (q.length < 2) {
     return [];
   }
   const b = biasOrDefault(bias);
-  const photonUrl = `${SP_PHOTON}?q=${encodeURIComponent(q)}&lat=${b.latitude}&lon=${b.longitude}&limit=8&lang=en`;
-  const nomUrl = `${SP_NOMINATIM}?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=1&limit=8&q=${encodeURIComponent(q)}`;
-  const omUrl = `${SP_OPENMETEO}?name=${encodeURIComponent(q)}&count=8&language=en&format=json&countryCode=US`;
+  const enc = encodeURIComponent(q);
+  const photonUrl = `${SP_PHOTON}?q=${enc}&lat=${b.latitude}&lon=${b.longitude}&limit=10&lang=en`;
+  const nomUrl = `${SP_NOMINATIM}?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=1&limit=8&q=${enc}`;
+  const omUrl = `${SP_OPENMETEO}?name=${enc}&count=8&language=en&format=json&countryCode=US`;
+  const censusUrl = `${SP_CENSUS}?address=${enc}&benchmark=Public_AR_Current&format=json`;
+  const arcUrl = `${SP_ARCGIS}?f=json&countryCode=USA&maxLocations=8&outFields=Addr_type,Match_addr,PlaceName,City,Region,Postal&location=${b.longitude},${b.latitude}&distance=80000&SingleLine=${enc}`;
 
-  const [photon, nominatim, openMeteo] = await Promise.all([
+  const [photon, nominatim, openMeteo, census, arcgis] = await Promise.all([
     fetchJson(photonUrl, { Accept: 'application/json' }, 8000).catch(() => null),
     fetchJson(nomUrl, { Accept: 'application/json', 'User-Agent': 'StormPath/1.0.0' }, 8000).catch(() => null),
     fetchJson(omUrl, { Accept: 'application/json' }, 8000).catch(() => null),
+    fetchJson(censusUrl, { Accept: 'application/json' }, 8000).catch(() => null),
+    fetchJson(arcUrl, { Accept: 'application/json' }, 8000).catch(() => null),
   ]);
 
-  const merged: SpPlace[] = [];
-  for (const place of [...fromPhoton(photon), ...fromNominatim(nominatim), ...fromOpenMeteo(openMeteo)]) {
-    pushUnique(merged, place);
-    if (merged.length >= 8) {
-      break;
-    }
-  }
-  return merged;
+  const photonHits: SpGeoHit[] = fromPhoton(photon).map((p) => ({
+    ...p,
+    rank: /\d/.test(p.label) ? 0 : 2,
+  }));
+  const nomHits: SpGeoHit[] = fromNominatim(nominatim).map((p) => ({
+    ...p,
+    rank: /\d/.test(p.label) ? 0 : 2,
+  }));
+  const omHits: SpGeoHit[] = fromOpenMeteo(openMeteo).map((p) => ({ ...p, rank: 3 }));
+  const merged = spMergeGeoHits(
+    [fromCensusBody(census), fromArcgisBody(arcgis), photonHits, nomHits, omHits],
+    10,
+  );
+  return merged.map(toPlace);
 }
 
 export async function fetchDrivingRoute(

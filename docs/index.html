@@ -743,15 +743,67 @@
       if (place) setPending(place);
     });
     document.getElementById('goDrive').onclick = () => { if (spPending) startDrive(spPending); };
+    function fromCensus(body) {
+      const matches = body && body.result && body.result.addressMatches || [];
+      return matches.map(function(row){
+        const c = row.coordinates || {};
+        return { label: row.matchedAddress || 'US address', sub: 'CENSUS MAF', lat: c.y, lon: c.x, rank: 0 };
+      }).filter(function(p){ return isFinite(p.lat) && isFinite(p.lon); });
+    }
+    function fromArcgis(body) {
+      return ((body && body.candidates) || []).map(function(row){
+        const loc = row.location || {};
+        const attr = row.attributes || {};
+        const kind = attr.Addr_type || '';
+        const place = attr.PlaceName || '';
+        const city = attr.City || '';
+        const region = attr.Region || '';
+        const match = attr.Match_addr || row.address || '';
+        const label = place && city && match.toLowerCase().indexOf(place.toLowerCase()) !== 0
+          ? place + ', ' + city + ', ' + (region || 'US')
+          : (match || place || 'US place');
+        const rank = (kind === 'PointAddress' || kind === 'StreetAddress') ? 0 : (kind === 'POI' ? 1 : 2);
+        return { label: label, sub: [kind, city, region].filter(Boolean).join(' · '), lat: loc.y, lon: loc.x, rank: rank, score: row.score };
+      }).filter(function(p){ return isFinite(p.lat) && isFinite(p.lon) && (p.score == null || p.score >= 70); });
+    }
+    function fromNominatimHits(body) {
+      if (!Array.isArray(body)) return [];
+      return body.map(function(row){
+        const addr = row.address || {};
+        const street = [addr.house_number, addr.road].filter(Boolean).join(' ');
+        const city = addr.city || addr.town || addr.village || '';
+        const label = (row.display_name || '').split(',').slice(0, 3).join(',').trim() || street || 'Place';
+        return { label: label, sub: street || city, lat: parseFloat(row.lat), lon: parseFloat(row.lon), rank: street ? 0 : 2 };
+      }).filter(function(p){ return isFinite(p.lat) && isFinite(p.lon); });
+    }
+    async function searchUS(q, bias) {
+      const enc = encodeURIComponent(q);
+      const loc = bias.lon + ',' + bias.lat;
+      const arc = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&countryCode=USA&maxLocations=8&outFields=Addr_type,Match_addr,PlaceName,City,Region,Postal&location=' + loc + '&distance=80000&SingleLine=' + enc;
+      const nom = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=1&limit=8&q=' + enc;
+      const pho = 'https://photon.komoot.io/api/?q=' + enc + '&lat=' + bias.lat + '&lon=' + bias.lon + '&limit=10&lang=en';
+      const [a, n, p] = await Promise.all([
+        fetch(arc).then(function(r){ return r.json(); }).catch(function(){ return null; }),
+        fetch(nom, { headers: { Accept: 'application/json' } }).then(function(r){ return r.json(); }).catch(function(){ return null; }),
+        fetch(pho).then(function(r){ return r.json(); }).catch(function(){ return null; })
+      ]);
+      const photonHits = ((p && p.features) || []).filter(function(f){ return f && f.geometry && f.geometry.coordinates; }).map(formatPhoton).map(function(h){ h.rank = /\d/.test(h.label) ? 0 : 2; return h; });
+      const merged = [].concat(fromArcgis(a), fromNominatimHits(n), photonHits).sort(function(x,y){ return (x.rank||2) - (y.rank||2); });
+      return uniquePlaces(merged).slice(0, 10);
+    }
     document.getElementById('q').addEventListener('input', (e)=>{
       clearTimeout(qTimer);
       qTimer = setTimeout(async ()=>{
         const q = e.target.value.trim();
         if (q.length<2) { document.getElementById('hits').innerHTML=''; spHits=[]; setPending(null); return; }
+        document.getElementById('hits').innerHTML = '<div class="muted" style="padding:10px 0">SEARCHING US ADDRESSES</div>';
         const bias = S.coords || S.view;
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${bias.lat}&lon=${bias.lon}&limit=8&lang=en`;
-        const body = await fetch(url).then(r=>r.json()).catch(()=>null);
-        spHits = uniquePlaces(((body&&body.features)||[]).filter(f=>f&&f.geometry&&f.geometry.coordinates).map(formatPhoton)).slice(0,6);
+        spHits = await searchUS(q, bias);
+        if (!spHits.length) {
+          document.getElementById('hits').innerHTML = '<div class="muted" style="padding:10px 0">NO MATCH — try 123 Main St, City, ST</div>';
+          setPending(null);
+          return;
+        }
         document.getElementById('hits').innerHTML = spHits.map((h,i)=>`<div class="hit" data-i="${i}"><b>${spEsc(h.label)}</b><div class="muted">${spEsc(h.sub || h.lat.toFixed(4)+', '+h.lon.toFixed(4))}</div></div>`).join('');
         setPending(null);
       }, 280);

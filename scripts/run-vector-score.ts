@@ -21,6 +21,7 @@ import { formatVectorReport, scoreVector, type VectorCheck } from '../src/core/v
 import { spPruneIntel, type SpIntelPin } from '../src/core/spVehicleIntel';
 import { spCamNext, spCamShouldReroute } from '../src/core/spCamera';
 import { parseRainViewerIndex } from '../src/core/spRadarTiles';
+import { fromArcgisBody, fromCensusBody, spMergeGeoHits } from '../src/core/spGeoParse';
 
 const fs = require('fs');
 const path = require('path');
@@ -308,6 +309,42 @@ extra.push({
     detail: 'global radar tiles + NOAA fallback; banner does not cover zoom',
   });
   extra.push({
+    id: 'GEO_CENSUS_ARCGIS_PARSE',
+    vector: 'engine',
+    weight: 6,
+    ok: (() => {
+      const census = fromCensusBody({
+        result: { addressMatches: [{ matchedAddress: '1400 WALNUT ST, MURPHYSBORO, IL, 62966', coordinates: { x: -89.3382, y: 37.7644 } }] },
+      });
+      const arc = fromArcgisBody({
+        candidates: [
+          {
+            score: 100,
+            address: '1400 Walnut St, Murphysboro, Illinois, 62966',
+            location: { x: -89.3383, y: 37.7645 },
+            attributes: { Addr_type: 'PointAddress', Match_addr: '1400 Walnut St, Murphysboro, Illinois, 62966', City: 'Murphysboro', Region: 'Illinois' },
+          },
+        ],
+      });
+      const merged = spMergeGeoHits([census, arc], 10);
+      return census.length === 1 && arc.length === 1 && merged.length === 1 && census[0].rank === 0;
+    })(),
+    detail: 'Census MAF + ArcGIS PointAddress parsers',
+  });
+  extra.push({
+    id: 'HUD_US_ADDRESS_SEARCH',
+    vector: 'hud',
+    weight: 8,
+    ok:
+      hud.indexOf('geocode.arcgis.com') >= 0 &&
+      hud.indexOf('nominatim.openstreetmap.org') >= 0 &&
+      hud.indexOf('function searchUS') >= 0 &&
+      hud.indexOf('photon.komoot.io') >= 0 &&
+      hud.indexOf('camFollowPan') >= 0 &&
+      hud.indexOf('api.rainviewer.com') >= 0,
+    detail: 'HUD multi-geocoder without dropping camera/radar',
+  });
+  extra.push({
     id: 'README_ORG_URL',
     vector: 'github',
     weight: 3,
@@ -348,6 +385,20 @@ async function withRuntime(): Promise<void> {
       'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/5/7/11.png',
       '',
       64,
+    ),
+    runtimeProbe(
+      'RUNTIME_ARCGIS_ADDR',
+      6,
+      'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&countryCode=USA&maxLocations=1&SingleLine=1400%20Walnut%20St%2C%20Murphysboro%2C%20IL',
+      '',
+      80,
+    ),
+    runtimeProbe(
+      'RUNTIME_CENSUS_ADDR',
+      6,
+      'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=1400%20Walnut%20St%2C%20Murphysboro%2C%20IL%2062966&benchmark=Public_AR_Current&format=json',
+      '',
+      80,
     ),
   ]);
   extra.push(...probes);
