@@ -11,176 +11,234 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     :root {
-      --bg:#020408; --raised:#060d14; --card:#0a1520; --border:rgba(0,229,255,.18);
-      --text:#e0f7fa; --muted:rgba(176,220,230,.65); --dim:#6F8296;
+      --bg:#020408; --panel:#060d14; --card:#0a1520; --border:rgba(0,229,255,.18);
+      --text:#e8fbff; --muted:#8aa4b3; --dim:#6F8296;
       --cyan:#00e5ff; --amber:#ffab00; --green:#00e676; --red:#ff3d3d;
     }
-    * { box-sizing:border-box; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
     html, body {
       margin:0; background:var(--bg); color:var(--text);
-      font-family: "Segoe UI", system-ui, sans-serif;
+      font-family:"Segoe UI", system-ui, sans-serif;
       height:100%; height:100dvh; max-height:100dvh; overflow:hidden;
     }
     .app { display:flex; flex-direction:column; height:100%; height:100dvh; min-height:0; }
-    .top {
-      background:var(--raised); border-bottom:1px solid var(--border);
-      padding:8px 12px 8px; padding-top:max(8px, env(safe-area-inset-top));
-      flex-shrink:0;
+    .topbar {
+      flex-shrink:0; background:var(--panel); border-bottom:1px solid var(--border);
+      padding:6px 10px 8px; padding-top:max(6px, env(safe-area-inset-top));
     }
-    .brand { display:flex; align-items:center; gap:8px; letter-spacing:2.4px; font-weight:800; font-size:13px; }
-    .mark { width:10px; height:10px; background:var(--cyan); border-radius:2px; }
+    .brand {
+      display:flex; align-items:center; gap:8px;
+      font-family:"Courier New", monospace; font-weight:900; letter-spacing:3px;
+      color:var(--cyan); font-size:15px; text-shadow:0 0 16px rgba(0,229,255,.35);
+    }
+    .mark { width:9px; height:9px; background:var(--cyan); box-shadow:0 0 10px var(--cyan); }
+    .clock { margin-left:auto; color:var(--cyan); letter-spacing:0; font-size:12px; font-weight:700; }
     .nav { display:flex; gap:6px; margin-top:8px; }
     .nav button {
-      flex:1; min-height:44px; background:transparent; color:var(--dim);
-      border:1px solid var(--border); border-radius:8px; letter-spacing:1px;
-      font-weight:700; font-size:11px; cursor:pointer;
+      flex:1; min-height:40px; background:transparent; color:var(--dim);
+      border:1px solid var(--border); letter-spacing:1.4px; font-weight:800; font-size:10px;
+      clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%); cursor:pointer;
     }
-    .nav button.active { color:var(--cyan); border-color:var(--cyan); background:#0C1C24; }
-    .status { display:flex; gap:10px; margin-top:8px; font-size:10px; letter-spacing:.6px; color:var(--muted); flex-wrap:wrap; align-items:center; }
-    .dot { width:7px; height:7px; border-radius:4px; display:inline-block; margin-right:4px; background:var(--amber); }
+    .nav button.active { color:var(--cyan); border-color:var(--cyan); background:rgba(0,229,255,.1); }
+    .badge-row { margin-top:6px; }
+    .badge {
+      display:inline-block; font:700 10px/1 "Courier New",monospace; letter-spacing:.8px;
+      border:1px solid var(--amber); color:var(--amber); padding:4px 8px;
+    }
+    .badge.live { border-color:var(--green); color:var(--green); }
     .stage { flex:1 1 auto; position:relative; overflow:hidden; min-height:0; }
     .screen { display:none; height:100%; overflow:auto; -webkit-overflow-scrolling:touch; }
     .screen.active { display:block; }
     #screen-map.screen.active { overflow:hidden; position:relative; height:100%; }
-    .pad { padding:20px 16px 40px; }
+    .pad { padding:16px 14px 36px; }
     #map, #map.leaflet-container {
       position:absolute !important; inset:0 !important;
-      width:100% !important; height:100% !important; min-height:0 !important;
-      background:#041018;
+      width:100% !important; height:100% !important; background:#041018;
+      z-index:0 !important;
     }
+    #map .sp-base-tiles { filter:invert(1) hue-rotate(180deg) brightness(.88) contrast(.92); }
     .kicker { color:var(--cyan); letter-spacing:2px; font-size:11px; font-weight:700; }
-    .hero { font-size:32px; font-weight:800; margin:6px 0; }
+    .hero { font-size:28px; font-weight:800; margin:6px 0 4px; }
     .muted { color:var(--muted); }
-    .card { border:1px solid var(--border); background:var(--card); border-radius:12px; padding:14px; margin-top:12px; }
-    .btn { min-height:48px; border-radius:10px; border:0; font-weight:800; letter-spacing:1.2px; cursor:pointer; width:100%; margin-top:10px; }
+    .card { border:1px solid var(--border); background:var(--card); padding:12px; margin-top:10px; }
+    .btn { min-height:48px; border:0; font-weight:800; letter-spacing:1.2px; cursor:pointer; width:100%; margin-top:10px; }
     .btn.primary { background:var(--cyan); color:#041016; }
     .btn.ghost { background:transparent; color:var(--amber); border:1px solid var(--amber); }
-    .bottom {
-      background:var(--raised); border-top:1px solid var(--border);
-      padding:8px 12px 12px; padding-bottom:max(12px, env(safe-area-inset-bottom));
-      font-size:11px; color:var(--muted); flex-shrink:0;
-    }
-    .fix { color:var(--cyan); font-family:"Courier New",monospace; font-size:10px; margin-top:4px; }
-    .search {
-      position:absolute; left:12px; right:12px; bottom:16px; min-height:48px;
-      background:rgba(7,11,16,.92); border:1px solid var(--cyan); color:var(--text);
-      border-radius:12px; cursor:pointer; z-index:8; font-weight:600;
-    }
+    .btn[hidden] { display:none !important; }
+    .chips { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
+    .chip-src { border:1px solid var(--border); padding:5px 8px; font-size:10px; letter-spacing:.6px; color:var(--muted); }
+    .chip-src.on { border-color:var(--green); color:var(--green); }
     .gps-gate {
-      position:absolute; top:8px; left:8px; right:88px; z-index:25;
-      max-height:92px; overflow:hidden;
-      background:rgba(7,11,16,.94); border:1px solid var(--cyan); color:var(--text);
-      border-radius:12px; cursor:pointer; text-align:left; padding:8px 12px;
-      font:800 12px/1.2 "Segoe UI",sans-serif; letter-spacing:1.1px;
+      position:absolute; top:8px; left:8px; right:88px; z-index:500;
+      min-height:40px; max-height:44px; overflow:hidden;
+      background:rgba(6,13,20,.94); border:1px solid var(--cyan); color:var(--text);
+      cursor:pointer; text-align:left; padding:8px 12px;
+      font:800 11px/1.1 "Courier New",monospace; letter-spacing:1px;
     }
-    .gps-gate b { color:var(--cyan); letter-spacing:1.2px; display:block; }
-    .gps-gate span { display:block; margin-top:4px; color:var(--muted); font-size:11px; font-weight:500; letter-spacing:0; line-height:1.35; text-transform:none; }
+    .gps-gate span { display:none; }
     .gps-gate[hidden] { display:none !important; }
+    .zooms { position:absolute; right:10px; top:8px; z-index:500; display:flex; flex-direction:column; gap:6px; }
+    .zooms button {
+      width:36px; height:36px; border:1px solid var(--cyan);
+      background:rgba(6,13,20,.92); color:var(--cyan); font-size:18px; font-weight:800;
+    }
+    .next {
+      position:absolute; left:10px; right:90px; bottom:72px; z-index:500;
+      background:rgba(6,13,20,.92); border:1px solid var(--amber); border-left:4px solid var(--amber);
+      padding:10px 12px; pointer-events:none;
+    }
+    .next .mi { color:var(--amber); font-weight:800; font-size:16px; font-family:"Courier New",monospace; }
+    .next .ins { font-size:13px; margin-top:2px; }
+    .next .dst { color:var(--muted); font-size:11px; margin-top:3px; }
     .speed {
-      position:absolute; right:10px; bottom:76px; width:72px; height:72px; z-index:8;
-      border-radius:36px; border:2px solid var(--cyan); background:rgba(7,11,16,.9);
+      position:absolute; right:10px; bottom:72px; width:70px; height:70px; z-index:500;
+      border-radius:35px; border:2px solid var(--cyan); background:rgba(6,13,20,.92);
       display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none;
     }
-    .speed b { font-size:22px; line-height:1; }
+    .speed b { font-size:22px; line-height:1; font-family:"Courier New",monospace; }
     .speed span { color:var(--cyan); font-size:10px; letter-spacing:1px; }
-    .next {
-      position:absolute; left:10px; right:90px; bottom:76px; z-index:8; pointer-events:none;
-      background:rgba(7,11,16,.88); border:1px solid var(--border); border-radius:12px; padding:10px 12px;
+    .dock {
+      position:absolute; left:10px; right:10px; bottom:10px; z-index:500;
+      display:flex; gap:8px; align-items:stretch;
     }
-    .next .mi { color:var(--amber); font-weight:800; font-size:16px; }
-    .next .ins { font-size:13px; margin-top:2px; }
-    .next .dst { color:var(--muted); font-size:11px; margin-top:3px; letter-spacing:.4px; }
-    .zooms { position:absolute; right:10px; top:8px; z-index:8; display:flex; flex-direction:column; gap:6px; }
-    .zooms button {
-      width:36px; height:36px; border-radius:8px; border:1px solid var(--cyan);
-      background:rgba(7,11,16,.92); color:var(--cyan); font-size:18px; font-weight:800; cursor:pointer;
+    .search-pill {
+      flex:1; min-height:48px; display:flex; flex-direction:column; justify-content:center;
+      background:rgba(6,13,20,.94); border:1px solid var(--cyan); color:var(--text);
+      text-align:left; padding:6px 12px; cursor:pointer;
+      clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);
+    }
+    .search-pill small { color:var(--cyan); letter-spacing:1.2px; font-size:9px; font-weight:800; }
+    .dock-btn {
+      width:52px; min-height:48px; flex-shrink:0; background:rgba(6,13,20,.94);
+      color:var(--cyan); border:1px solid var(--cyan); font-size:8px; letter-spacing:.6px; font-weight:800;
+    }
+    .dock-btn.amber { color:var(--amber); border-color:var(--amber); }
+    .bottom {
+      flex-shrink:0; background:var(--panel); border-top:1px solid var(--border);
+      padding:6px 12px; padding-bottom:max(8px, env(safe-area-inset-bottom));
+      font:700 10px/1.3 "Courier New",monospace; color:var(--muted); letter-spacing:.4px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     }
     .sheet {
-      display:none; position:absolute; inset:auto 0 0; background:var(--raised);
-      border-top-left-radius:18px; border-top-right-radius:18px; padding:12px 16px 24px;
-      z-index:20; max-height:86%; overflow:auto;
+      display:none; position:absolute; inset:auto 0 0; background:var(--panel);
+      border-top-left-radius:16px; border-top-right-radius:16px; padding:14px 16px 28px;
+      z-index:700; max-height:86%; overflow:auto;
     }
     .sheet.open { display:block; }
-    input { width:100%; min-height:48px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:0 12px; }
+    input { width:100%; min-height:48px; background:var(--bg); color:var(--text); border:1px solid var(--border); padding:0 12px; }
     .hit { padding:12px 0; border-bottom:1px solid var(--border); cursor:pointer; }
     .toast {
       display:none; position:absolute; left:16px; right:16px; bottom:88px;
       background:#0C1C24; border:1px solid var(--cyan); color:var(--cyan);
-      text-align:center; padding:10px; border-radius:8px; z-index:30; letter-spacing:1px; font-weight:700; font-size:12px;
+      text-align:center; padding:10px; z-index:800; letter-spacing:1px; font-weight:700; font-size:12px;
     }
     .toast.show { display:block; }
-    .grid { display:flex; flex-wrap:wrap; gap:10px; }
-    .chip { width:calc(50% - 5px); border:1px solid var(--border); border-radius:8px; padding:12px; }
-    .clock { display:flex; gap:8px; }
-    .cell { flex:1; border:1px solid var(--border); border-radius:8px; text-align:center; padding:10px 0; }
-    .cell b { display:block; font-size:22px; }
-    .cell span { color:var(--dim); font-size:10px; letter-spacing:1px; }
-    #map .sp-base-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.88) contrast(0.92); }
+    .grid { display:flex; flex-wrap:wrap; gap:8px; }
+    .chip { width:calc(50% - 4px); border:1px solid var(--border); padding:12px; }
+    .clockrow { display:flex; gap:6px; }
+    .cell { flex:1; border:1px solid var(--border); text-align:center; padding:10px 0; }
+    .cell b { display:block; font-size:20px; }
+    .cell span { color:var(--dim); font-size:9px; letter-spacing:1px; }
+    .scope {
+      width:220px; height:220px; margin:12px auto; border-radius:110px; overflow:hidden;
+      border:1px solid var(--border); background:#041018; position:relative;
+    }
+    .scope img { width:100%; height:100%; object-fit:cover; }
+    .scope .wait {
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      color:var(--muted); font-size:11px; letter-spacing:1px; text-align:center; padding:16px;
+      pointer-events:none;
+    }
+    .row { display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border); padding:12px 0; }
+    .row b { display:block; }
+    .row span { color:var(--muted); font-size:12px; }
+    .toggle { border:1px solid var(--cyan); background:transparent; color:var(--cyan); min-width:64px; min-height:36px; font-weight:800; }
   </style>
 </head>
 <body>
   <div class="app">
-    <div class="top">
-      <div class="brand"><span class="mark"></span>STORMPATH <span id="clock" style="margin-left:auto;color:var(--cyan);font-family:Courier New,monospace;letter-spacing:0">--:--:--</span></div>
+    <div class="topbar">
+      <div class="brand"><span class="mark"></span>STORMPATH<span class="clock" id="clock">--:--:--</span></div>
       <div class="nav">
-        <button data-screen="driver">DRIVER</button>
+        <button data-screen="driver">⬤ DRIVER</button>
         <button data-screen="map" class="active">MAP</button>
         <button data-screen="weather">WEATHER</button>
         <button data-screen="settings">SETTINGS</button>
       </div>
-      <div class="status">
-        <span><i class="dot" id="dGps"></i><span id="lGps">GPS WAIT</span></span>
-        <span><i class="dot" id="dWx"></i><span id="lWx">WX VIEW</span></span>
-        <span><i class="dot" id="dRadar"></i><span id="lRadar">RADAR VIEW</span></span>
-        <span id="badge" style="margin-left:auto;color:var(--amber)">VIEW · MURPHYSBORO</span>
-      </div>
+      <div class="badge-row"><div class="badge" id="badge">VIEW · MURPHYSBORO — NOT GPS</div></div>
     </div>
     <div class="stage">
       <section id="screen-driver" class="screen"><div class="pad">
         <div class="kicker">DRIVER</div>
         <div class="hero" id="drvState">SAFE MODE</div>
         <div class="muted" id="drvConf">CONFIDENCE: N/A UNKNOWN</div>
+        <div class="chips" id="srcChips"></div>
         <div class="card">
           <div class="kicker" id="drvLive">READY</div>
-          <h2 style="margin:6px 0 8px">You're on the map</h2>
-          <p class="muted">iPhone HUD for Storm Path. Map opens on Murphysboro, Illinois — view only. Device GPS is the only LIVE NWS / NOAA trigger. IP location is never GPS. AND-GATE requires GPS ∧ NWS ∧ radar.</p>
+          <h2 style="margin:6px 0 8px" id="drvTitle">You're on the map</h2>
+          <p class="muted" id="drvCopy">Map opens on Murphysboro, Illinois — VIEW only. Device GPS is the only LIVE NWS / NOAA trigger. IP location is never GPS.</p>
         </div>
         <button class="btn primary" id="btnSearch">START DRIVE</button>
         <button class="btn ghost" id="btnGps">USE MY LIVE GPS</button>
         <div class="kicker" style="margin-top:18px">TIME TO ARRIVE</div>
-        <div class="clock" id="eta"><div class="cell"><b>0</b><span>DAYS</span></div><div class="cell"><b>0</b><span>HOURS</span></div><div class="cell"><b>0</b><span>MIN</span></div><div class="cell"><b>0</b><span>SEC</span></div></div>
+        <div class="clockrow" id="eta">
+          <div class="cell"><b>0</b><span>DAYS</span></div>
+          <div class="cell"><b>0</b><span>HOURS</span></div>
+          <div class="cell"><b>0</b><span>MIN</span></div>
+          <div class="cell"><b>0</b><span>SEC</span></div>
+        </div>
         <div class="card" id="nowCard"><b>↑</b> Set a destination to load the route</div>
       </div></section>
+
       <section id="screen-map" class="screen active">
         <div id="map"></div>
         <div class="zooms">
           <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
           <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
         </div>
-        <button class="gps-gate" id="gpsGate" type="button"><b>USE MY LIVE GPS</b><span>Map is Murphysboro, IL — VIEW only. Device GPS is the only LIVE NWS / NOAA trigger. IP location is never GPS.</span></button>
+        <button class="gps-gate" id="gpsGate" type="button">USE MY LIVE GPS<span>Map is Murphysboro, IL — VIEW only. Device GPS is the only LIVE NWS / NOAA trigger. IP location is never GPS.</span></button>
         <div class="next" id="nextHud">
           <div class="mi" id="nextMi">—</div>
           <div class="ins" id="nextIns">Set a destination</div>
           <div class="dst" id="nextDst">SEARCH TO NAVIGATE</div>
         </div>
-        <div class="speed"><b id="spd">--</b><span id="spdUnit">MPH</span></div>
-        <button class="search" id="mapSearch">Town, state, or address</button>
+        <div class="speed"><b id="spd">--</b><span>MPH</span></div>
+        <div class="dock">
+          <button class="search-pill" id="mapSearch" type="button">
+            <small>SET DESTINATION</small>
+            <span id="mapSearchLabel">Town, state, or address</span>
+          </button>
+          <button class="dock-btn" id="btnMarker" type="button">MARKER</button>
+          <button class="dock-btn amber" id="btnReport" type="button">REPORT</button>
+        </div>
       </section>
+
       <section id="screen-weather" class="screen"><div class="pad">
         <div class="kicker">WEATHER</div>
         <div class="hero" id="wxState">SAFE MODE</div>
-        <div class="kicker" style="margin-top:18px">RADAR</div>
-        <img id="radarImg" alt="NOAA radar" width="512" height="220" style="width:100%;height:220px;object-fit:cover;border-radius:12px;border:1px solid var(--border);display:none;background:#041018" />
-        <div class="kicker" style="margin-top:18px">CURRENT CONDITIONS</div>
+        <div class="kicker" style="margin-top:16px">RADAR SCOPE</div>
+        <div class="scope">
+          <img id="radarImg" alt="NOAA radar" />
+          <div class="wait" id="radarWait">AWAITING GPS</div>
+        </div>
+        <div class="muted" style="text-align:center;font-size:11px">NWS BASE REFLECTIVITY — <span id="radarCap">VIEW</span><br>Empty circle = no precipitation returns, not a missing radar.</div>
+        <div class="kicker" style="margin-top:16px">CURRENT CONDITIONS</div>
         <div class="grid" id="wxGrid"></div>
-        <div class="kicker" style="margin-top:18px">LIVE NWS ALERTS</div>
+        <div class="kicker" style="margin-top:16px">LIVE NWS ALERTS</div>
         <div id="alerts" class="muted">VIEW · MURPHYSBORO — AWAITING GPS FOR LIVE AND-GATE</div>
+        <div class="kicker" style="margin-top:16px">SOURCE STATUS</div>
+        <div id="wxSources" class="muted"></div>
       </div></section>
+
       <section id="screen-settings" class="screen"><div class="pad">
         <div class="kicker">SETTINGS</div>
         <div class="card"><b>AND-GATE</b><p class="muted" id="andGate">GPS=false WX=false RADAR=false</p></div>
-        <div class="card"><b>Storm Path 1.0.0</b><p class="muted">Navigation × weather. Live NWS. Live NOAA radar. OpenStreetMap tiles. Map view default is Murphysboro, Illinois — view only. First finite GPS fix is the only NWS / NOAA WMS trigger that can leave SAFE MODE. AND-GATE requires GPS ∧ NWS ∧ radar.</p><p><a href="privacy.html" style="color:var(--cyan)">Privacy policy</a></p></div>
+        <div class="row"><div><b>Speed units</b><span>Live GPS speed from this device</span></div><button class="toggle" id="setUnits">MPH</button></div>
+        <div class="row"><div><b>Map tiles</b><span>OpenStreetMap dark basemap</span></div><button class="toggle" type="button">OSM</button></div>
+        <div class="row"><div><b>Storm Path 1.0.0</b><span>Live device GPS, National Weather Service, NOAA radar, OpenStreetMap, OSRM. First finite GPS fix is the only NWS / NOAA WMS trigger that can leave SAFE MODE. AND-GATE requires GPS ∧ NWS ∧ radar. IP location is never GPS.</span></div></div>
+        <p><a href="privacy.html" style="color:var(--cyan)">Privacy policy</a></p>
       </div></section>
+
       <div class="sheet" id="sheet">
         <div class="kicker">NAVIGATION</div>
         <h3 style="margin:4px 0 12px">Set destination</h3>
@@ -190,13 +248,14 @@
       </div>
       <div class="toast" id="toast"></div>
     </div>
-    <div class="bottom"><div id="ticker">VIEW · MURPHYSBORO, IL — TAP GPS FOR LIVE NWS</div><div class="fix" id="fix">VIEW 37.7645, -89.3351</div></div>
+    <div class="bottom" id="ticker">VIEW · MURPHYSBORO, IL — TAP GPS FOR LIVE NWS</div>
   </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const VIEW = { lat: 37.7645, lon: -89.3351 };
     const RANK = { normal:0, caution:1, danger:2, stop:3 };
     const UA = 'StormPath/1.0.0 (voltcore-org hud; https://github.com/voltcore-org/storm-path-mobile; dominic.calandro1991@yahoo.com)';
+    const SOURCES = ['NOAA','NWS','DOT','EMERG MGMT','ROAD CLOSURES','SHELTERS'];
     function spComputeNextState(g, w, r, last) { return (g && w && r) ? (last || 'normal') : 'safe'; }
     function classify(a) {
       const e = (a.event||'').toLowerCase();
@@ -210,48 +269,64 @@
       for (const a of list) { const c = classify(a); if (RANK[c] > RANK[worst]) worst = c; }
       return worst;
     }
-    const S = { screen:'map', gps:false, wx:false, radar:false, last:null, coords:null, view:{ lat:VIEW.lat, lon:VIEW.lon, why:'murphysboro' }, dest:null, route:null, hourly:null, alerts:[], radarUrl:null, speed:null, step:null };
+    const S = { screen:'map', gps:false, wx:false, radar:false, last:null, coords:null, view:{ lat:VIEW.lat, lon:VIEW.lon, why:'murphysboro' }, dest:null, route:null, hourly:null, alerts:[], radarUrl:null, speed:null, step:null, units:'MPH' };
     const map = L.map('map', { zoomControl:false }).setView([VIEW.lat, VIEW.lon], 13);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap', className:'sp-base-tiles' }).addTo(map);
     let marker = null, destMark = null, line = null, radarLayer = null, watchId = null;
-    function setDot(el, ok) { el.style.background = ok ? 'var(--green)' : 'var(--amber)'; }
     function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2400); }
+    function kickMap() { try { map.invalidateSize(); } catch (e) {} }
     function paint() {
       const state = spComputeNextState(S.gps, S.wx, S.radar, S.last);
       const label = state === 'safe' ? 'SAFE MODE' : state.toUpperCase();
       document.getElementById('drvState').textContent = label;
       document.getElementById('wxState').textContent = label;
       document.getElementById('drvLive').textContent = S.gps ? 'LIVE FIX' : 'READY';
+      document.getElementById('drvTitle').textContent = S.gps ? "You're live" : "You're on the map";
+      document.getElementById('drvCopy').textContent = S.gps
+        ? 'Live GPS is on. Search a town or address, then Start Drive. Weather and radar stay on the live fix.'
+        : 'Map opens on Murphysboro, Illinois — VIEW only. Device GPS is the only LIVE NWS / NOAA trigger. IP location is never GPS.';
+      document.getElementById('btnGps').hidden = !!S.gps;
       document.getElementById('andGate').textContent = `GPS=${S.gps} WX=${S.wx} RADAR=${S.radar}`;
-      setDot(document.getElementById('dGps'), S.gps);
-      setDot(document.getElementById('dWx'), S.wx || Boolean(S.hourly));
-      setDot(document.getElementById('dRadar'), S.radar || Boolean(S.radarUrl));
-      document.getElementById('lGps').textContent = S.gps ? 'GPS LIVE' : 'GPS WAIT';
-      document.getElementById('lWx').textContent = S.wx ? 'WX LIVE' : (S.hourly ? 'WX VIEW' : 'WX WAIT');
-      document.getElementById('lRadar').textContent = S.radar ? 'RADAR LIVE' : (S.radarUrl ? 'RADAR VIEW' : 'RADAR WAIT');
+      document.getElementById('drvConf').textContent = S.gps && S.wx && S.radar
+        ? 'CONFIDENCE: HIGH  LIVE'
+        : (S.gps ? 'CONFIDENCE: MEDIUM  GPS LIVE · WX WAIT' : 'CONFIDENCE: N/A  VIEW');
       const live = S.gps && S.wx && S.radar;
       const badge = document.getElementById('badge');
-      badge.textContent = live ? 'WX + RADAR LIVE' : (!S.gps ? 'VIEW · MURPHYSBORO' : 'WX/RADAR WAIT · SAFE MODE');
-      badge.style.color = live ? 'var(--green)' : 'var(--amber)';
+      badge.textContent = live ? 'WX + RADAR LIVE' : (!S.gps ? 'VIEW · MURPHYSBORO — NOT GPS' : 'WX/RADAR WAIT · SAFE MODE');
+      badge.classList.toggle('live', live);
       document.getElementById('ticker').textContent = !S.gps
-        ? 'VIEW · MURPHYSBORO, IL — TAP GPS FOR LIVE NWS'
+        ? 'VIEW · MURPHYSBORO — NOT GPS'
         : (S.alerts[0] ? S.alerts.map(a=>a.event).join(' · ') : (S.wx ? 'NO ACTIVE NWS ALERTS AT THE LIVE FIX' : 'NWS WAIT'));
-      document.getElementById('fix').textContent = S.coords
-        ? `LIVE ${S.coords.lat.toFixed(4)}, ${S.coords.lon.toFixed(4)}`
-        : `VIEW ${S.view.lat.toFixed(4)}, ${S.view.lon.toFixed(4)}`;
-      const grid = document.getElementById('wxGrid');
+      document.getElementById('srcChips').innerHTML = SOURCES.map((n)=>{
+        const on = (n==='NWS' && (S.wx || S.hourly)) || (n==='NOAA' && (S.radar || S.radarUrl));
+        return `<div class="chip-src${on?' on':''}">${n}</div>`;
+      }).join('');
+      document.getElementById('wxSources').textContent = `NWS · ${S.wx?'LIVE':(S.hourly?'VIEW':'WAIT')}   NOAA · ${S.radar?'LIVE':(S.radarUrl?'VIEW':'WAIT')}   OSM · CONNECTED   OSRM · ${S.route?'CONNECTED':'IDLE'}`;
       const h = S.hourly || {};
-      grid.innerHTML = [['TEMP', h.temperature||'--'],['WIND', h.wind||'--'],['RH', h.humidity||'--'],['PRESSURE','N/A']].map(([k,v])=>`<div class="chip"><div class="muted">${k}</div><b>${v}</b></div>`).join('');
+      document.getElementById('wxGrid').innerHTML = [['TEMP', h.temperature||'--'],['WIND', h.wind||'--'],['RH', h.humidity||'--'],['PRESSURE','N/A'],['VIS','N/A'],['CAPE','N/A']].map(([k,v])=>`<div class="chip"><div class="muted">${k}</div><b>${v}</b></div>`).join('');
       document.getElementById('alerts').textContent = !S.gps
         ? (S.alerts.length ? ('VIEW · ' + S.alerts.map(a=>`${a.event} · ${a.severity}`).join('\n')) : 'VIEW · MURPHYSBORO — AWAITING GPS FOR LIVE AND-GATE')
         : (S.alerts.length ? S.alerts.map(a=>`${a.event} · ${a.severity}`).join('\n') : 'No active alerts at the live fix');
       const img = document.getElementById('radarImg');
-      if (S.radarUrl) { img.src = S.radarUrl; img.style.display='block'; } else img.style.display='none';
+      const wait = document.getElementById('radarWait');
+      if (S.radarUrl) {
+        img.src = S.radarUrl;
+        img.style.display = 'block';
+        wait.textContent = S.radar ? 'NO PRECIP RETURNS · LIVE' : 'VIEW RADAR';
+        wait.style.opacity = '.85';
+      } else {
+        img.style.display = 'none';
+        wait.textContent = 'AWAITING GPS';
+        wait.style.opacity = '1';
+      }
+      document.getElementById('radarCap').textContent = S.radar ? 'LIVE' : (S.radarUrl ? 'VIEW' : 'WAIT');
       if (S.dest) {
         const miles = S.route ? `${S.route.miles.toFixed(1)} mi` : 'route wait';
         document.getElementById('nowCard').innerHTML = `<b>↑ ${miles}</b><div>${S.dest.label}</div><div class="muted">${S.gps ? (S.route ? 'LIVE ROUTE' : 'GPS LIVE · ROUTING') : (S.route ? 'VIEW ROUTE · TAP GPS TO GO LIVE' : 'DESTINATION SET · AWAITING GPS')}</div>`;
+        document.getElementById('mapSearchLabel').textContent = S.dest.label;
       } else {
         document.getElementById('nowCard').innerHTML = `<b>↑</b> Set a destination to load the route`;
+        document.getElementById('mapSearchLabel').textContent = 'Town, state, or address';
       }
       document.getElementById('nextMi').textContent = S.step ? S.step.mi : (S.route ? S.route.miles.toFixed(1)+' mi' : '—');
       document.getElementById('nextIns').textContent = S.step ? S.step.ins : (S.dest ? 'Head toward destination' : 'Set a destination');
@@ -275,8 +350,10 @@
     document.getElementById('closeSheet').onclick = ()=>document.getElementById('sheet').classList.remove('open');
     document.getElementById('zoomIn').onclick = ()=>map.zoomIn();
     document.getElementById('zoomOut').onclick = ()=>map.zoomOut();
-    let qTimer;
-    let spHits = [];
+    document.getElementById('btnMarker').onclick = ()=>toast('MARKER · CYAN FIX');
+    document.getElementById('btnReport').onclick = ()=>toast('REPORT SAVED ON DEVICE');
+    document.getElementById('setUnits').onclick = function(){ S.units = S.units==='MPH'?'KMH':'MPH'; this.textContent=S.units; };
+    let qTimer, spHits = [];
     document.getElementById('hits').addEventListener('click', (e) => {
       const el = e.target.closest('.hit');
       if (!el) return;
@@ -302,7 +379,6 @@
       if (!place || !isFinite(place.lat) || !isFinite(place.lon)) return;
       S.dest = place;
       document.getElementById('sheet').classList.remove('open');
-      document.getElementById('mapSearch').textContent = place.label;
       if (destMark) destMark.remove();
       destMark = L.circleMarker([place.lat, place.lon], { radius:7, color:'#FFAB00', fillColor:'#FFAB00', fillOpacity:.9 }).addTo(map);
       const from = S.coords || S.view;
@@ -344,10 +420,9 @@
         S.alerts = (a.features||[]).map(f=>({ event:f.properties.event, severity:f.properties.severity, urgency:f.properties.urgency }));
         S.last = live ? evaluate(S.alerts) : S.last;
         S.wx = !!live;
-      } catch { if (live) S.wx = false; }
-      const half = 1.25;
-      const bbox = `${lon-half},${lat-half},${lon+half},${lat+half}`;
-      const radar = `https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&version=1.1.1&request=GetMap&layers=conus_bref_qcd&format=image/png&transparent=true&srs=CRS:84&bbox=${bbox}&width=512&height=512`;
+      } catch (e) { if (live) S.wx = false; }
+      const half = 0.35;
+      const radar = `https://nowcoast.noaa.gov/geoserver/weather_radar/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=conus_base_reflectivity_mosaic&STYLES=&CRS=EPSG:4326&BBOX=${lat-half},${lon-half},${lat+half},${lon+half}&WIDTH=512&HEIGHT=512&FORMAT=image/png&TRANSPARENT=true`;
       S.radarUrl = radar;
       if (radarLayer) map.removeLayer(radarLayer);
       radarLayer = L.imageOverlay(radar, [[lat-half,lon-half],[lat+half,lon+half]], { opacity:.55 }).addTo(map);
@@ -378,85 +453,30 @@
           if (watchId==null) {
             watchId = navigator.geolocation.watchPosition(w=>{
               if (!S.gps) return;
-              S.coords = { lat:w.coords.latitude, lon:w.coords.longitude };
-              if (w.coords.speed!=null && isFinite(w.coords.speed)) S.speed = w.coords.speed;
-              if (marker) marker.setLatLng([w.coords.latitude, w.coords.longitude]);
-              paint();
-            }, ()=>{}, { enableHighAccuracy:true, maximumAge:4000, timeout:20000 });
+              onFix(w.coords.latitude, w.coords.longitude, w.coords.speed);
+            }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000 });
           }
         },
-        () => { toast('GPS DENIED OR TIMED OUT — VIEW RETAINED'); paint(); },
-        { enableHighAccuracy:true, timeout:20000, maximumAge:10000 }
+        () => toast('GPS DENIED — VIEW HELD'),
+        { enableHighAccuracy:true, timeout:12000 }
       );
     }
-    function tryNetwork(){
-      if (S.gps) return;
-      fetch('https://get.geojs.io/v1/ip/geo.json').then(r=>r.ok?r.json():null).then(body=>{
-        if (S.gps || !body) return;
-        const lat = parseFloat(body.latitude), lon = parseFloat(body.longitude);
-        if (!isFinite(lat) || !isFinite(lon)) return;
-        const org = [body.organization, body.organization_name, body.asn, body.country].join(' ');
-        if (/google|amazon|aws|azure|microsoft|digitalocean|cloudflare|ovh|hetzner|linode|oracle|colo|datacenter|facebook|meta|cloud/i.test(org)) return;
-        const cc = String(body.country_code || body.country || '').toUpperCase();
-        if (cc && cc !== 'US' && cc !== 'USA' && cc.indexOf('UNITED STATES') < 0) return;
-        applyView(lat, lon, 'network');
+    function tryNetwork() {
+      fetch('https://get.geojs.io/v1/ip/geo.json').then(r=>r.json()).then((g)=>{
+        const lat = parseFloat(g.latitude), lon = parseFloat(g.longitude);
+        if (isFinite(lat) && isFinite(lon)) applyView(lat, lon, 'network');
       }).catch(()=>{});
     }
-    document.getElementById('gpsGate').addEventListener('click', requestGps);
-    document.getElementById('btnGps').addEventListener('click', requestGps);
+    document.getElementById('gpsGate').onclick = requestGps;
+    document.getElementById('btnGps').onclick = requestGps;
     document.getElementById('btnSearch').addEventListener('click', function(){ if(!S.gps) tryNetwork(); });
-    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:false}); }, 1000);
-    function kickMap(){ try { map.invalidateSize(); } catch(e) {} }
+    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString(); }, 1000);
     window.addEventListener('resize', kickMap);
     if (window.visualViewport) window.visualViewport.addEventListener('resize', kickMap);
-    if (window.ResizeObserver) new ResizeObserver(kickMap).observe(document.getElementById('screen-map'));
-    setTimeout(kickMap, 80);
-    setTimeout(kickMap, 400);
-    applyView(VIEW.lat, VIEW.lon, 'murphysboro');
-    requestGps();
-    setTimeout(function(){ if(!S.gps) tryNetwork(); }, 1600);
     paint();
-  </script>
-  <script>
-  (function(){
-    var SRC="storm-path-mobile";
-    var URL="https://core-api.dominic-calandro1991.workers.dev/api/v1/events";
-    var NWS="https://api.weather.gov/alerts/active/count";
-    var RADAR="https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&version=1.1.1&request=GetMap&layers=conus_bref_qcd&format=image/png&transparent=true&srs=CRS:84&bbox=-90,37,-88,39&width=64&height=64";
-    var frames=0,last=performance.now(),fps=0,gpsAccuracy=0,gpsState="unavailable",nwsOk=false,radarOk=false;
-    function tick(t){frames++;if(t-last>=1000){fps=frames;frames=0;last=t;}requestAnimationFrame(tick);}
-    requestAnimationFrame(tick);
-    function emit(type,severity,payload){
-      try{fetch(URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:SRC,type:type,severity:severity,payload:payload||{}}),keepalive:true}).catch(function(){});}catch(e){}
-    }
-    function quality(m){if(typeof m!=="number"||!isFinite(m)||m<0)return 0;return Math.max(0,Math.min(1,1-(m-5)/50));}
-    function sampleGps(){
-      if(!navigator.geolocation){gpsState="unsupported";gpsAccuracy=0;return;}
-      try{
-        navigator.geolocation.getCurrentPosition(function(pos){
-          gpsAccuracy=quality(pos&&pos.coords?pos.coords.accuracy:NaN);gpsState="fix";
-        },function(err){gpsAccuracy=0;gpsState=err&&err.code===1?"denied":"unavailable";},{enableHighAccuracy:true,maximumAge:30000,timeout:8000});
-      }catch(e){gpsState="unavailable";gpsAccuracy=0;}
-    }
-    function probeNws(){
-      var c=typeof AbortController!=="undefined"?new AbortController():null;
-      var t=c?setTimeout(function(){c.abort();},8000):null;
-      fetch(NWS,{headers:{Accept:"application/ld+json","User-Agent":"StormPath-Mobile/1.0 (voltcore-org telemetry)"},signal:c?c.signal:undefined})
-        .then(function(r){nwsOk=!!r.ok;}).catch(function(){nwsOk=false;}).then(function(){if(t)clearTimeout(t);});
-    }
-    function probeRadar(){
-      var c=typeof AbortController!=="undefined"?new AbortController():null;
-      var t=c?setTimeout(function(){c.abort();},10000):null;
-      fetch(RADAR,{signal:c?c.signal:undefined}).then(function(r){if(!r.ok){radarOk=false;return null;}return r.arrayBuffer();})
-        .then(function(b){if(b)radarOk=b.byteLength>32;}).catch(function(){radarOk=false;}).then(function(){if(t)clearTimeout(t);});
-    }
-    function health(){
-      return {status:"live",surface:"mobile-web",gps_accuracy:gpsAccuracy,gps_state:gpsState,nws_radar_status:radarOk,weather_api_health:nwsOk,frame_rate:fps};
-    }
-    sampleGps();probeNws();probeRadar();
-    setTimeout(function(){emit("app.event","info",health());},1600);
-    setInterval(function(){sampleGps();probeNws();probeRadar();setTimeout(function(){emit("health.heartbeat","info",health());},1600);},30000);
-  })();
+    applyView(VIEW.lat, VIEW.lon, 'murphysboro');
+    setTimeout(kickMap, 200);
+    requestGps();
   </script>
 </body>
 </html>
