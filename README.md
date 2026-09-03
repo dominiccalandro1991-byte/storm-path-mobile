@@ -1,18 +1,18 @@
-# Storm Path
+# Storm Path Mobile
 
 Native iOS / Android app for weather-aware navigation.
 
-Repository: [dominiccalandro1991-byte/storm-path-mobile](https://github.com/dominiccalandro1991-byte/storm-path-mobile)
+Repository: [voltcore-org/storm-path-mobile](https://github.com/voltcore-org/storm-path-mobile)
 
-This tree is **not** `dominiccalandro1991-byte/storm-path`. The web core is frozen. No file in this repository may mutate the web repo.
+This tree is **not** `voltcore-org/storm-path`. The web core is isolated. No file in this repository may mutate the web repo.
 
 ## Test it on GitHub
 
-- **Live HUD (this commit, no install):** [jsDelivr HUD](https://cdn.jsdelivr.net/gh/dominiccalandro1991-byte/storm-path-mobile@main/docs/index.html)
+- **Live HUD:** [https://voltcore-org.github.io/storm-path-mobile/](https://voltcore-org.github.io/storm-path-mobile/)
 - **CI:** Actions tab → `storm-path-mobile-ci` → `engine` job (golden + vector score artifact)
-- **Privacy:** [docs/privacy.html](https://github.com/dominiccalandro1991-byte/storm-path-mobile/blob/main/docs/privacy.html)
+- **Privacy:** [docs/privacy.html](https://voltcore-org.github.io/storm-path-mobile/privacy.html)
 
-Allow location on the HUD. Device GNSS is the store binary via `expo-location`. GitHub Pages for this repo needs Settings → Pages → GitHub Actions once (the token in CI cannot create the Pages site).
+Allow location on the HUD. Device GNSS is the store binary via `expo-location`. Map view default is Murphysboro, Illinois — view only. IP geolocation is VIEW, never GPS.
 
 ## What it does
 
@@ -24,7 +24,7 @@ AND-gate:
 nextState = (GPS && WX && RADAR) ? (lastAlert || normal) : safe
 ```
 
-Map view default is Murphysboro, Illinois. That default is **view only**. First finite GPS fix is the only legal NWS / NOAA WMS trigger.
+This is not a life-safety system. NWS/NOAA only. Never treat a map view or stale/IP location as live GPS.
 
 ## Store packaging
 
@@ -46,4 +46,4 @@ npm run test:golden
 npm run test:vector
 ```
 
-Vector score must print `PASS` at ≥ 90%.
+Vector score must print `PASS` at ≥ 90%. Engine checks execute the AND-gate. Runtime checks hit live NWS, NOAA WMS, and OSM. File-presence-only is not a pass.

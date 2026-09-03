@@ -17,7 +17,7 @@ export function TopBar(): React.ReactElement {
   const { snapshot, switchScreen } = useStormPath();
   const live = snapshot.gpsAvailable && snapshot.weatherOK && snapshot.radarOK;
   const badge = !snapshot.gpsAvailable
-    ? 'AWAITING GPS FIX'
+    ? 'VIEW · MURPHYSBORO'
     : live
       ? 'WX + RADAR LIVE'
       : 'WX/RADAR WAIT · SAFE MODE';
@@ -47,6 +47,7 @@ export function TopBar(): React.ReactElement {
       </View>
       <View style={styles.statusRow}>
         <StatusChip ok={snapshot.gpsAvailable} label={snapshot.gpsAvailable ? 'GPS LIVE' : 'GPS WAIT'} />
+        <StatusChip ok={snapshot.weatherOK} label={snapshot.weatherOK ? 'WX LIVE' : 'WX WAIT'} />
         <StatusChip ok={snapshot.radarOK} label={snapshot.radarOK ? 'RADAR LIVE' : 'RADAR WAIT'} />
         <Text style={[styles.badge, live ? styles.badgeLive : styles.badgeWait]}>{badge}</Text>
       </View>
@@ -58,7 +59,7 @@ export function BottomBar(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { snapshot } = useStormPath();
   const ticker = !snapshot.gpsAvailable
-    ? 'AWAITING A LIVE LOCATION FOR NWS ALERTS…'
+    ? 'VIEW · MURPHYSBORO, IL — TAP GPS FOR LIVE NWS'
     : snapshot.alerts.length
       ? snapshot.alerts.map((a) => a.event || 'Active alert').join('  ·  ')
       : snapshot.weatherOK
@@ -66,7 +67,7 @@ export function BottomBar(): React.ReactElement {
         : 'NWS WAIT · RETRYING PUBLIC api.weather.gov';
   const fix = snapshot.coords
     ? `${snapshot.coords.latitude.toFixed(4)}, ${snapshot.coords.longitude.toFixed(4)}`
-    : 'ACQUIRING GPS FIX…';
+    : 'VIEW 37.7645, -89.3351';
 
   return (
     <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 10) }]}>

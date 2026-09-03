@@ -36,5 +36,5 @@
     "submit:android": "eas submit --platform android --profile production --latest"
   },
   "private": true,
-  "description": "Storm Path native app. Isolated from dominiccalandro1991-byte/storm-path. Expo + TypeScript."
+  "description": "Storm Path native app. Isolated from voltcore-org/storm-path. Expo + TypeScript."
 }

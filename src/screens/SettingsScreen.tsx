@@ -27,7 +27,7 @@ export function SettingsScreen(): React.ReactElement {
       <Row title="Speed limit badge" body="Posted limit next to your speed when the road has one" action={snapshot.showLimit ? 'ON' : 'OFF'} onPress={toggleLimit} />
 
       <Text style={styles.head}>MAP</Text>
-      <Row title="Map place names" body="Dark Carto tiles with US towns and streets" action={snapshot.showLabels ? 'ON' : 'OFF'} onPress={toggleLabels} />
+      <Row title="Map place names" body="Dark OpenStreetMap tiles with US towns and streets" action={snapshot.showLabels ? 'ON' : 'OFF'} onPress={toggleLabels} />
       <Row title="Device GPS" body="Re-request the foreground location permission" action="RETRY" onPress={requestGps} />
 
       <Text style={styles.head}>THIS DEVICE</Text>
@@ -47,12 +47,12 @@ export function SettingsScreen(): React.ReactElement {
       <Text style={styles.head}>ABOUT</Text>
       <Text style={styles.body}>
         Storm Path {SP_APP_VERSION}. Navigation × weather. Live NWS. Live NOAA radar. Live device GPS. Map view
-        default is Murphysboro, Illinois — view only. First finite GPS fix is the only NWS / NOAA WMS trigger.
-        Isolated repo storm-path-mobile. Web core mutation forbidden.
+        default is Murphysboro, Illinois — view only. First finite GPS fix is the only NWS / NOAA WMS trigger that
+        can leave SAFE MODE. OpenStreetMap tiles. Isolated repo storm-path-mobile. Web core mutation forbidden.
       </Text>
       <Pressable
         onPress={() => {
-          void Linking.openURL('https://dominiccalandro1991-byte.github.io/storm-path-mobile/privacy.html');
+          void Linking.openURL('https://voltcore-org.github.io/storm-path-mobile/privacy.html');
         }}
       >
         <Text style={styles.link}>Privacy policy</Text>

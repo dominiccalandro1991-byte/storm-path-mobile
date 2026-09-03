@@ -87,7 +87,7 @@ export function MapScreen(): React.ReactElement {
           <Text style={styles.gpsGateTitle}>USE MY LIVE GPS</Text>
           <Text style={styles.gpsGateCopy}>
             First finite device fix is the only legal NWS / NOAA trigger. Map opens on Murphysboro as a view
-            default only.
+            default only. IP location is never GPS.
           </Text>
         </Pressable>
       ) : null}
@@ -117,15 +117,18 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   gpsGate: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(7,11,16,0.92)',
+    top: 8,
+    left: 8,
+    right: 88,
+    maxHeight: 92,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(7,11,16,0.94)',
     borderColor: SP_COLOR.cyan,
     borderWidth: 1,
     borderRadius: 12,
-    padding: 14,
-    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 4,
   },
   gpsGateTitle: { color: SP_COLOR.cyan, fontWeight: '800', letterSpacing: 1.2 },
   gpsGateCopy: { color: SP_COLOR.muted, fontSize: 12, lineHeight: 18 },
