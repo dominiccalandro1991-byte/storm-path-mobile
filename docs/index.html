@@ -170,7 +170,7 @@
         <div class="kicker">WEATHER</div>
         <div class="hero" id="wxState">SAFE MODE</div>
         <div class="kicker" style="margin-top:18px">RADAR</div>
-        <img id="radarImg" alt="radar" width="220" height="220" style="border-radius:110px;border:1px solid var(--border);display:none" />
+        <img id="radarImg" alt="NOAA radar" width="512" height="220" style="width:100%;height:220px;object-fit:cover;border-radius:12px;border:1px solid var(--border);display:none;background:#041018" />
         <div class="kicker" style="margin-top:18px">CURRENT CONDITIONS</div>
         <div class="grid" id="wxGrid"></div>
         <div class="kicker" style="margin-top:18px">LIVE NWS ALERTS</div>
@@ -247,11 +247,11 @@
         : (S.alerts.length ? S.alerts.map(a=>`${a.event} · ${a.severity}`).join('\n') : 'No active alerts at the live fix');
       const img = document.getElementById('radarImg');
       if (S.radarUrl) { img.src = S.radarUrl; img.style.display='block'; } else img.style.display='none';
-      if (S.route) {
-        const sec = Math.round(S.route.min*60);
-        const cells = [Math.floor(sec/86400), Math.floor((sec%86400)/3600), Math.floor((sec%3600)/60), sec%60];
-        document.getElementById('eta').innerHTML = ['DAYS','HOURS','MIN','SEC'].map((l,i)=>`<div class="cell"><b>${cells[i]}</b><span>${l}</span></div>`).join('');
-        document.getElementById('nowCard').innerHTML = `<b>↑ ${S.route.miles.toFixed(1)} mi</b><div>${S.dest ? S.dest.label : ''}</div>`;
+      if (S.dest) {
+        const miles = S.route ? `${S.route.miles.toFixed(1)} mi` : 'route wait';
+        document.getElementById('nowCard').innerHTML = `<b>↑ ${miles}</b><div>${S.dest.label}</div><div class="muted">${S.gps ? (S.route ? 'LIVE ROUTE' : 'GPS LIVE · ROUTING') : (S.route ? 'VIEW ROUTE · TAP GPS TO GO LIVE' : 'DESTINATION SET · AWAITING GPS')}</div>`;
+      } else {
+        document.getElementById('nowCard').innerHTML = `<b>↑</b> Set a destination to load the route`;
       }
       document.getElementById('nextMi').textContent = S.step ? S.step.mi : (S.route ? S.route.miles.toFixed(1)+' mi' : '—');
       document.getElementById('nextIns').textContent = S.step ? S.step.ins : (S.dest ? 'Head toward destination' : 'Set a destination');
@@ -276,43 +276,56 @@
     document.getElementById('zoomIn').onclick = ()=>map.zoomIn();
     document.getElementById('zoomOut').onclick = ()=>map.zoomOut();
     let qTimer;
+    let spHits = [];
+    document.getElementById('hits').addEventListener('click', (e) => {
+      const el = e.target.closest('.hit');
+      if (!el) return;
+      const place = spHits[+el.dataset.i];
+      if (place) startDrive(place);
+    });
     document.getElementById('q').addEventListener('input', (e)=>{
       clearTimeout(qTimer);
       qTimer = setTimeout(async ()=>{
         const q = e.target.value.trim();
-        if (q.length<2) return;
+        if (q.length<2) { document.getElementById('hits').innerHTML=''; spHits=[]; return; }
         const bias = S.coords || S.view;
         const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${bias.lat}&lon=${bias.lon}&limit=6&lang=en`;
         const body = await fetch(url).then(r=>r.json()).catch(()=>null);
-        const hits = ((body&&body.features)||[]).map(f=>({
+        spHits = ((body&&body.features)||[]).map(f=>({
           label: (f.properties&& (f.properties.name || 'Place')) + (f.properties.state ? ', '+f.properties.state : ''),
           lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0]
         }));
-        document.getElementById('hits').innerHTML = hits.map((h,i)=>`<div class="hit" data-i="${i}"><b>${h.label}</b></div>`).join('');
-        document.querySelectorAll('.hit').forEach(el=>el.onclick=()=>startDrive(hits[+el.dataset.i]));
+        document.getElementById('hits').innerHTML = spHits.map((h,i)=>`<div class="hit" data-i="${i}"><b>${h.label}</b></div>`).join('');
       }, 280);
     });
     async function startDrive(place) {
+      if (!place || !isFinite(place.lat) || !isFinite(place.lon)) return;
       S.dest = place;
       document.getElementById('sheet').classList.remove('open');
       document.getElementById('mapSearch').textContent = place.label;
       if (destMark) destMark.remove();
       destMark = L.circleMarker([place.lat, place.lon], { radius:7, color:'#FFAB00', fillColor:'#FFAB00', fillOpacity:.9 }).addTo(map);
-      if (S.coords) {
-        const url = `https://router.project-osrm.org/route/v1/driving/${S.coords.lon},${S.coords.lat};${place.lon},${place.lat}?overview=full&geometries=geojson&steps=true`;
-        const body = await fetch(url).then(r=>r.json()).catch(()=>null);
-        if (body && body.routes && body.routes[0]) {
-          const r = body.routes[0];
-          S.route = { miles: r.distance/1609.34, min: r.duration/60 };
-          const step = r.legs && r.legs[0] && r.legs[0].steps && r.legs[0].steps[0];
-          S.step = step ? { mi: (step.distance/1609.34).toFixed(1)+' mi', ins: (step.maneuver && step.maneuver.instruction) || 'Continue' } : null;
-          if (line) line.remove();
-          line = L.geoJSON(r.geometry, { style:{ color:'#FFAB00', weight:4 } }).addTo(map);
-          map.fitBounds(line.getBounds(), { padding:[40,40] });
-        }
+      const from = S.coords || S.view;
+      const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${place.lon},${place.lat}?overview=full&geometries=geojson&steps=true`;
+      const body = await fetch(url).then(r=>r.json()).catch(()=>null);
+      if (body && body.routes && body.routes[0]) {
+        const r = body.routes[0];
+        S.route = { miles: r.distance/1609.34, min: r.duration/60 };
+        const steps = (r.legs && r.legs[0] && r.legs[0].steps) || [];
+        const step = steps.find((s) => s.distance > 40) || steps[0];
+        S.step = step ? { mi: (step.distance/1609.34).toFixed(1)+' mi', ins: (step.maneuver && step.maneuver.instruction) || 'Continue' } : null;
+        if (line) line.remove();
+        line = L.geoJSON(r.geometry, { style:{ color:'#FFAB00', weight:4 } }).addTo(map);
+        try { map.fitBounds(line.getBounds(), { padding:[40,40] }); } catch(e) { map.setView([place.lat, place.lon], 13); }
+        const sec = Math.round(S.route.min*60);
+        const cells = [Math.floor(sec/86400), Math.floor((sec%86400)/3600), Math.floor((sec%3600)/60), sec%60];
+        document.getElementById('eta').innerHTML = ['DAYS','HOURS','MIN','SEC'].map((l,i)=>`<div class="cell"><b>${cells[i]}</b><span>${l}</span></div>`).join('');
+      } else {
+        map.setView([place.lat, place.lon], 13);
       }
       toast('DRIVE TO '+place.label.toUpperCase());
       paint();
+      setTimeout(kickMap, 80);
     }
     function nwsHeaders() { return { Accept:'application/geo+json', 'User-Agent': UA }; }
     async function loadAtmosphere(lat, lon, live) {
@@ -348,6 +361,7 @@
       else marker.setLatLng([lat,lon]);
       map.setView([lat,lon], 14);
       await loadAtmosphere(lat, lon, true);
+      if (S.dest) await startDrive(S.dest);
     }
     function applyView(lat, lon, why) {
       if (S.gps) return;
