@@ -39,7 +39,8 @@ import {
   type SpValidatedConfidence,
 } from '../core/spTypes';
 import { nextWeatherBackoffMs, spFetchWeather } from '../net/spNWS';
-import { buildRadarWmsUrl, probeRadarDecode, radarBoundsFromFix } from '../net/spRadar';
+import { buildRadarWmsUrl, fetchRainViewerFrame, probeRadarDecode, radarBoundsFromFix } from '../net/spRadar';
+import { SP_IEM_NEXRAD_TILE } from '../core/spRadarTiles';
 import { CHIP_QUERIES, fetchDrivingRoute, isSpPlace, searchPlaces, type SpPlace, type SpRoute } from '../net/spGeocode';
 import { readCurrentFix, requestForegroundLocation, watchFixes } from '../location/spLocation';
 import {
@@ -70,6 +71,7 @@ export type StormSnapshot = {
   hourly: SpNwsHourlyChips | null;
   alerts: SpNwsAlert[];
   radarUrl: string | null;
+  radarTileUrl: string | null;
   mapLayoutOk: boolean;
   pressureChip: 'N/A';
   visibilityChip: 'N/A';
@@ -166,6 +168,7 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
   const [hourly, setHourly] = useState<SpNwsHourlyChips | null>(null);
   const [alerts, setAlerts] = useState<SpNwsAlert[]>([]);
   const [radarUrl, setRadarUrl] = useState<string | null>(null);
+  const [radarTileUrl, setRadarTileUrl] = useState<string | null>(null);
   const [destination, setDestination] = useState<SpPlace | null>(null);
   const [route, setRoute] = useState<SpRoute | null>(null);
   const [driving, setDriving] = useState(false);
@@ -277,6 +280,8 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
     flagsRef.current.radarOK = decoded;
     setRadarOK(decoded);
     setRadarUrl(decoded ? url : null);
+    const frame = await fetchRainViewerFrame();
+    setRadarTileUrl(frame ? frame.tileUrl : SP_IEM_NEXRAD_TILE);
     setLiveSources((prev) => {
       const next = spPromoteLiveSource(prev, 'NOAA', decoded ? 'connected' : 'unavailable');
       flagsRef.current.liveSources = next;
@@ -697,6 +702,7 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
       hourly,
       alerts,
       radarUrl,
+      radarTileUrl,
       mapLayoutOk,
       pressureChip: 'N/A',
       visibilityChip: 'N/A',
@@ -737,6 +743,7 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
       markerOpen,
       radarOK,
       radarUrl,
+      radarTileUrl,
       recents,
       record,
       route,

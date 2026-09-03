@@ -20,6 +20,7 @@ declare function fetch(
 import { formatVectorReport, scoreVector, type VectorCheck } from '../src/core/vectorScore';
 import { spPruneIntel, type SpIntelPin } from '../src/core/spVehicleIntel';
 import { spCamNext, spCamShouldReroute } from '../src/core/spCamera';
+import { parseRainViewerIndex } from '../src/core/spRadarTiles';
 
 const fs = require('fs');
 const path = require('path');
@@ -49,7 +50,7 @@ function fileCheck(id: string, vector: VectorCheck['vector'], weight: number, re
 
 const extra: VectorCheck[] = [
   fileCheck('HUD_DRIVER', 'hud', 5, 'src/screens/DriverScreen.tsx', ['TIME TO ARRIVE', 'START DRIVE', 'CONFIDENCE']),
-  fileCheck('HUD_MAP', 'hud', 5, 'src/screens/MapScreen.tsx', ['UrlTile', 'Polyline', 'Overlay', 'tile.openstreetmap.org', 'Murphysboro']),
+  fileCheck('HUD_MAP', 'hud', 5, 'src/screens/MapScreen.tsx', ['UrlTile', 'Polyline', 'minZoomLevel={2}', 'tile.openstreetmap.org', 'followCam']),
   fileCheck('HUD_WEATHER', 'hud', 4, 'src/screens/WeatherScreen.tsx', ['LIVE NWS ALERTS', 'RADAR']),
   fileCheck('HUD_SETTINGS', 'hud', 3, 'src/screens/SettingsScreen.tsx', ['Speed units', 'AND-GATE', 'OpenStreetMap']),
   fileCheck('HUD_SEARCH', 'hud', 4, 'src/ui/SearchSheet.tsx', ['Set destination', 'START DRIVE']),
@@ -217,7 +218,7 @@ extra.push({
     id: 'HUD_LEAFLET_NOT_ON_DOCK',
     vector: 'hud',
     weight: 3,
-    ok: hud.indexOf('.leaflet-control-attribution { display:none') >= 0 && hud.indexOf('right:52px') >= 0,
+    ok: hud.indexOf('.leaflet-control-attribution { display:none') >= 0 && hud.indexOf('under-banner') >= 0,
     detail: 'OSM credit not over dock; banner clears zoom',
   });
   extra.push({
@@ -277,6 +278,36 @@ extra.push({
     detail: 'native map is not a controlled region',
   });
   extra.push({
+    id: 'RADAR_PARSE_RAINVIEWER',
+    vector: 'engine',
+    weight: 4,
+    ok: (() => {
+      const hit = parseRainViewerIndex({
+        host: 'https://tilecache.rainviewer.com',
+        radar: { past: [{ time: 1788471600, path: '/v2/radar/262b1d72e745' }] },
+      });
+      return (
+        !!hit &&
+        hit.tileUrl.indexOf('{z}/{x}/{y}') >= 0 &&
+        hit.tileUrl.indexOf('/v2/radar/') >= 0 &&
+        parseRainViewerIndex({}) === null
+      );
+    })(),
+    detail: 'RainViewer index parser',
+  });
+  extra.push({
+    id: 'HUD_RADAR_TILES',
+    vector: 'hud',
+    weight: 8,
+    ok:
+      hud.indexOf('api.rainviewer.com/public/weather-maps.json') >= 0 &&
+      hud.indexOf('L.tileLayer') >= 0 &&
+      hud.indexOf("half = 0.35") < 0 &&
+      hud.indexOf('conus_bref_qcd') >= 0 &&
+      hud.indexOf('under-banner') >= 0,
+    detail: 'global radar tiles + NOAA fallback; banner does not cover zoom',
+  });
+  extra.push({
     id: 'README_ORG_URL',
     vector: 'github',
     weight: 3,
@@ -310,8 +341,37 @@ async function withRuntime(): Promise<void> {
     runtimeProbe('RUNTIME_PAGES_HUD', 8, 'https://voltcore-org.github.io/storm-path-mobile/', 'StormPath-Mobile/1.0.0', 10000),
     runtimeProbe('RUNTIME_VEH_PNG', 4, 'https://voltcore-org.github.io/storm-path-mobile/vehicles/twister.png', 'StormPath-Mobile/1.0.0', 1024),
     runtimeProbe('RUNTIME_INTEL_PNG', 4, 'https://voltcore-org.github.io/storm-path-mobile/intel/unit.png', 'StormPath-Mobile/1.0.0', 1024),
+    runtimeProbe('RUNTIME_RAINVIEWER_INDEX', 6, 'https://api.rainviewer.com/public/weather-maps.json', '', 64),
+    runtimeProbe(
+      'RUNTIME_IEM_NEXRAD',
+      4,
+      'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/5/7/11.png',
+      '',
+      64,
+    ),
   ]);
   extra.push(...probes);
+  try {
+    const idx = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+    const bytes = new Uint8Array(await idx.arrayBuffer());
+    let text = '';
+    for (let i = 0; i < bytes.length; i++) text += String.fromCharCode(bytes[i]);
+    const frame = parseRainViewerIndex(JSON.parse(text));
+    if (frame) {
+      const tile = frame.tileUrl.replace('{z}', '3').replace('{x}', '1').replace('{y}', '2');
+      extra.push(await runtimeProbe('RUNTIME_RAINVIEWER_TILE', 8, tile, '', 64));
+    } else {
+      extra.push({ id: 'RUNTIME_RAINVIEWER_TILE', vector: 'github', weight: 8, ok: false, detail: 'index parse failed' });
+    }
+  } catch (err) {
+    extra.push({
+      id: 'RUNTIME_RAINVIEWER_TILE',
+      vector: 'github',
+      weight: 8,
+      ok: false,
+      detail: String(err && (err as { message?: string }).message ? (err as { message: string }).message : err),
+    });
+  }
   const report = scoreVector(extra);
   const text = formatVectorReport(report);
   console.log(text);

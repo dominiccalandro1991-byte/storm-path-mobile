@@ -4,7 +4,29 @@ import {
   SP_RADAR_WMS_BASE,
   spIsFiniteNumber,
 } from '../core/spTypes';
+import { parseRainViewerIndex, SP_RAINVIEWER_INDEX, type SpRainViewerFrame } from '../core/spRadarTiles';
 import { spHwAssertIo } from '../diagnostics/spHardwareLog';
+
+export { SP_IEM_NEXRAD_TILE, SP_RAINVIEWER_INDEX, parseRainViewerIndex } from '../core/spRadarTiles';
+export type { SpRainViewerFrame } from '../core/spRadarTiles';
+
+export async function fetchRainViewerFrame(): Promise<SpRainViewerFrame | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    const response = await fetch(SP_RAINVIEWER_INDEX, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!response.ok) {
+      return null;
+    }
+    return parseRainViewerIndex(await response.json());
+  } catch {
+    return null;
+  }
+}
 
 export type RadarBounds = {
   minLon: number;

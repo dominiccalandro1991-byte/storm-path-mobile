@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, Overlay, Polyline, PROVIDER_DEFAULT, UrlTile } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_DEFAULT, UrlTile } from 'react-native-maps';
 import { SP_COLOR } from '../theme';
 import { formatSpeed, useStormPath } from '../state/StormPathStore';
-import { radarBoundsFromFix } from '../net/spRadar';
 import { VEHICLE_IMAGES, INTEL_IMAGES } from '../ui/markerAssets';
 import { SP_CAM_FOLLOW_ZOOM } from '../core/spCamera';
+import { SP_IEM_NEXRAD_TILE } from '../core/spRadarTiles';
 
 const OSM_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
@@ -79,16 +79,7 @@ export function MapScreen(): React.ReactElement {
     return undefined;
   }, [snapshot.coords, snapshot.destination, snapshot.route]);
 
-  const bounds = snapshot.coords
-    ? radarBoundsFromFix(snapshot.coords.latitude, snapshot.coords.longitude)
-    : null;
-  const overlayBounds: [[number, number], [number, number]] | null =
-    bounds && snapshot.radarUrl
-      ? [
-          [bounds.maxLat, bounds.maxLon],
-          [bounds.minLat, bounds.minLon],
-        ]
-      : null;
+  const overlayTemplate = snapshot.radarTileUrl || SP_IEM_NEXRAD_TILE;
 
   const step = snapshot.route?.steps[0];
   const spd = formatSpeed(snapshot.coords, snapshot.gpsAvailable, snapshot.speedUnits);
@@ -123,6 +114,7 @@ export function MapScreen(): React.ReactElement {
         onPanDrag={() => setFollowCam(false)}
       >
         <UrlTile urlTemplate={OSM_TILE} maximumZ={19} tileSize={256} />
+        <UrlTile urlTemplate={overlayTemplate} maximumZ={12} tileSize={256} zIndex={2} />
         {snapshot.coords ? (
           <Marker
             coordinate={{
@@ -164,9 +156,6 @@ export function MapScreen(): React.ReactElement {
         ))}
         {routeCoords.length > 1 ? (
           <Polyline coordinates={routeCoords} strokeColor={SP_COLOR.amber} strokeWidth={4} />
-        ) : null}
-        {snapshot.radarUrl && overlayBounds ? (
-          <Overlay image={{ uri: snapshot.radarUrl }} bounds={overlayBounds} opacity={0.55} />
         ) : null}
       </MapView>
 
