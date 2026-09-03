@@ -1,0 +1,32 @@
+SP_VECTOR_SCORE 147/147 100% PASS
+PASS  engine  +12  GOLDEN_INVARIANTS  all hold
+PASS  engine  +4  STARTUP_SAFE_ON_LAYOUT  map layout + schema pass
+PASS  engine  +6  SIX_STATES  normal/caution/danger/stop/safe/offline
+PASS  engine  +4  FOUR_SCREENS  driver/map/weather/settings
+PASS  engine  +4  SIX_SOURCES  NOAA NWS DOT EMERG ROAD SHELTERS
+PASS  engine  +10  AND_GATE_SAFE  radar fail forces safe even on stop
+PASS  engine  +8  AND_GATE_LIVE  three-source live preserves lastAlert
+PASS  engine  +8  PROTOTYPE_BAN  prototype sources cannot validate HIGH
+PASS  engine  +6  TORNADO_STOP  classifier + empty-alert normal
+PASS  engine  +3  SCREEN_NOOP  invalid screen is a no-op
+PASS  engine  +5  VIEW_DEFAULT_MURPHYSBORO  map-view default is Murphysboro, not a live I/O trigger
+PASS  store   +4  APP_VERSION_1_0_0  1.0.0
+PASS  hud     +5  HUD_DRIVER  src/screens/DriverScreen.tsx
+PASS  hud     +5  HUD_MAP  src/screens/MapScreen.tsx
+PASS  hud     +4  HUD_WEATHER  src/screens/WeatherScreen.tsx
+PASS  hud     +3  HUD_SETTINGS  src/screens/SettingsScreen.tsx
+PASS  hud     +4  HUD_SEARCH  src/ui/SearchSheet.tsx
+PASS  hud     +3  HUD_CHROME  src/ui/Chrome.tsx
+PASS  engine  +6  GPS_GATE  src/diagnostics/spHardwareLog.ts
+PASS  engine  +4  NWS_ORIGIN  src/net/spNWS.ts
+PASS  engine  +4  RADAR_WMS  src/net/spRadar.ts
+PASS  hud     +3  GEOCODE_OSRM  src/net/spGeocode.ts
+PASS  store   +4  STORE_APP_JSON  app.json
+PASS  store   +3  STORE_EAS  eas.json
+PASS  store   +3  STORE_PRIVACY  docs/privacy.html
+PASS  github  +4  GITHUB_CI  .github/workflows/mobile-ci.yml
+PASS  github  +3  GITHUB_PAGES  .github/workflows/pages.yml
+PASS  github  +4  GITHUB_TEST_HUD  docs/index.html
+PASS  github  +3  ISOLATION_NO_WEB_HTML  package.json
+PASS  github  +5  ISOLATION_WEB_BLOB  no StormpathV1_3_5.html / index.html
+PASS  store   +3  ICON_ASSETS  icon + splash + adaptive
