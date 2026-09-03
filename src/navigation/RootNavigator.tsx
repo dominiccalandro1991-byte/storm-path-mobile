@@ -8,6 +8,8 @@ import { WeatherScreen } from '../screens/WeatherScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { BottomBar, ToastHost, TopBar } from '../ui/Chrome';
 import { SearchSheet } from '../ui/SearchSheet';
+import { MarkerSheet } from '../ui/MarkerSheet';
+import { IntelSheet } from '../ui/IntelSheet';
 import { useStormPath } from '../state/StormPathStore';
 import { SP_COLOR } from '../theme';
 
@@ -50,6 +52,8 @@ export function RootNavigator(): React.ReactElement {
       </View>
       <BottomBar />
       <SearchSheet />
+      <MarkerSheet />
+      <IntelSheet />
       <ToastHost />
     </View>
   );

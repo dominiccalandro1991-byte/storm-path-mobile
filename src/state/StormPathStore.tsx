@@ -18,6 +18,13 @@ import { runStartupSafetyChecks } from '../core/spStartup';
 import { runGoldenInvariantChecks } from '../core/spGoldenChecks';
 import { parseLsValue } from '../core/spPersistence';
 import {
+  isSpIntelPin,
+  spFindIntelType,
+  spFindVehicle,
+  spPruneIntel,
+  type SpIntelPin,
+} from '../core/spVehicleIntel';
+import {
   SP_LS_SCHEMA,
   SP_MAP_VIEW_DEFAULT,
   SP_WEATHER_REFRESH_OK_MS,
@@ -80,6 +87,10 @@ export type StormSnapshot = {
   showLimit: boolean;
   toast: string;
   clock: string;
+  vehicleId: string | null;
+  intelPins: SpIntelPin[];
+  markerOpen: boolean;
+  intelOpen: boolean;
 };
 
 type StormContextValue = {
@@ -103,6 +114,11 @@ type StormContextValue = {
   clearIntel: () => void;
   clearPlans: () => void;
   showToast: (msg: string) => void;
+  setMarkerOpen: (open: boolean) => void;
+  setIntelOpen: (open: boolean) => void;
+  setVehicle: (id: string) => void;
+  postIntel: (typeId: string, subtype: string | null, note: string) => void;
+  deleteIntel: (id: string) => void;
   mapViewDefault: typeof SP_MAP_VIEW_DEFAULT;
 };
 
@@ -163,6 +179,10 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
   const [showLimit, setShowLimit] = useState(true);
   const [toast, setToast] = useState('');
   const [clock, setClock] = useState(clockNow);
+  const [vehicleId, setVehicleId] = useState<string | null>(null);
+  const [intelPins, setIntelPins] = useState<SpIntelPin[]>([]);
+  const [markerOpen, setMarkerOpen] = useState(false);
+  const [intelOpen, setIntelOpen] = useState(false);
 
   const weatherInFlight = useRef(false);
   const weatherTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -421,9 +441,13 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
         const recRaw = await AsyncStorage.getItem('sp.recents.v1');
         const savRaw = await AsyncStorage.getItem('sp.saved.v1');
         const setRaw = await AsyncStorage.getItem('sp.settings.v1');
+        const vehRaw = await AsyncStorage.getItem('sp.vehicle.v1');
+        const intelRaw = await AsyncStorage.getItem('sp.intel.v1');
         const recParsed = parseLsValue('sp.recents.v1', recRaw);
         const savParsed = parseLsValue('sp.saved.v1', savRaw);
         const setParsed = parseLsValue('sp.settings.v1', setRaw);
+        const vehParsed = parseLsValue('sp.vehicle.v1', vehRaw);
+        const intelParsed = parseLsValue('sp.intel.v1', intelRaw);
         if (!cancelled && Array.isArray(recParsed)) {
           setRecents(recParsed.filter(isSpPlace).slice(0, 8));
         }
@@ -445,6 +469,12 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
           if (typeof rec.showLimit === 'boolean') {
             setShowLimit(rec.showLimit);
           }
+        }
+        if (!cancelled && typeof vehParsed === 'string' && spFindVehicle(vehParsed)) {
+          setVehicleId(vehParsed);
+        }
+        if (!cancelled && Array.isArray(intelParsed)) {
+          setIntelPins(spPruneIntel(intelParsed.filter(isSpIntelPin)));
         }
         for (const key of Object.keys(SP_LS_SCHEMA)) {
           const raw = await AsyncStorage.getItem(key);
@@ -578,9 +608,68 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
   }, [persistJson, showToast]);
 
   const clearIntel = useCallback(() => {
+    setIntelPins([]);
     void persistJson('sp.intel.v1', []);
     showToast('DRIVER INTEL CLEARED');
   }, [persistJson, showToast]);
+
+  const setVehicle = useCallback(
+    (id: string) => {
+      const v = spFindVehicle(id);
+      if (!v) {
+        return;
+      }
+      setVehicleId(id);
+      void persistJson('sp.vehicle.v1', id);
+      showToast(`MARKER SET · ${v.label}`);
+    },
+    [persistJson, showToast],
+  );
+
+  const postIntel = useCallback(
+    (typeId: string, subtype: string | null, note: string) => {
+      const spec = spFindIntelType(typeId);
+      if (!spec) {
+        return;
+      }
+      const fix = flagsRef.current.coords;
+      const gps = flagsRef.current.gpsAvailable && fix;
+      const lat = gps ? fix.latitude : SP_MAP_VIEW_DEFAULT.latitude;
+      const lon = gps ? fix.longitude : SP_MAP_VIEW_DEFAULT.longitude;
+      const item: SpIntelPin = {
+        id: `i${Date.now()}`,
+        type: typeId,
+        subtype,
+        label: spec.label + (subtype ? ` · ${subtype.replace(/_/g, ' ').toUpperCase()}` : ''),
+        note: note.trim().slice(0, 140),
+        color: spec.color,
+        lat,
+        lon,
+        source: gps ? 'gps' : 'map',
+        ts: Date.now(),
+      };
+      setIntelPins((prev) => {
+        const next = spPruneIntel([item, ...prev]).slice(0, 40);
+        void persistJson('sp.intel.v1', next);
+        return next;
+      });
+      setIntelOpen(false);
+      showToast(`INTEL POSTED · ${item.label}`);
+    },
+    [persistJson, showToast],
+  );
+
+  const deleteIntel = useCallback(
+    (id: string) => {
+      setIntelPins((prev) => {
+        const next = prev.filter((p) => p.id !== id);
+        void persistJson('sp.intel.v1', next);
+        return next;
+      });
+      showToast('INTEL DELETED');
+    },
+    [persistJson, showToast],
+  );
 
   const clearPlans = useCallback(() => {
     void persistJson('sp.plans.v1', []);
@@ -625,6 +714,10 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
       showLimit,
       toast,
       clock,
+      vehicleId,
+      intelPins,
+      markerOpen,
+      intelOpen,
     }),
     [
       activeScreen,
@@ -636,9 +729,12 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
       driving,
       gpsAvailable,
       hourly,
+      intelOpen,
+      intelPins,
       lastAlertState,
       liveSources,
       mapLayoutOk,
+      markerOpen,
       radarOK,
       radarUrl,
       recents,
@@ -655,6 +751,7 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
       startupSafe,
       toast,
       validated,
+      vehicleId,
       weatherOK,
     ],
   );
@@ -690,10 +787,13 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
       clearPlans,
       clearRecents,
       clearSaved,
+      deleteIntel,
       markMapLayout,
+      postIntel,
       requestGps,
       runSearch,
       saveSlot,
+      setVehicle,
       showToast,
       snapshot,
       spRecomputeState,

@@ -18,6 +18,7 @@ declare function fetch(
 ): Promise<{ ok: boolean; status: number; arrayBuffer(): Promise<ArrayBuffer> }>;
 
 import { formatVectorReport, scoreVector, type VectorCheck } from '../src/core/vectorScore';
+import { spPruneIntel, type SpIntelPin } from '../src/core/spVehicleIntel';
 
 const fs = require('fs');
 const path = require('path');
@@ -150,15 +151,55 @@ extra.push({
     id: 'NATIVE_MAP_MARKER',
     vector: 'hud',
     weight: 6,
-    ok: read('src/screens/MapScreen.tsx').indexOf('VORTEX') >= 0 || read('src/screens/MapScreen.tsx').indexOf('Choose a form') >= 0,
-    detail: 'native MapScreen marker packs',
+    ok:
+      read('src/ui/MarkerSheet.tsx').indexOf('Choose a form') >= 0 &&
+      read('src/core/spVehicleIntel.ts').indexOf('VORTEX') >= 0 &&
+      read('src/screens/MapScreen.tsx').indexOf('MARKER') >= 0 &&
+      exists('assets/vehicles/twister.png'),
+    detail: 'native MarkerSheet + VORTEX packs + PNG',
   });
   extra.push({
     id: 'NATIVE_MAP_INTEL',
     vector: 'hud',
     weight: 6,
-    ok: read('src/screens/MapScreen.tsx').indexOf('POST INTEL') >= 0 || read('src/screens/MapScreen.tsx').indexOf('DRIVER INTEL') >= 0,
-    detail: 'native MapScreen driver intel board',
+    ok:
+      read('src/ui/IntelSheet.tsx').indexOf('DRIVER INTEL') >= 0 &&
+      read('src/ui/IntelSheet.tsx').indexOf('POST INTEL') >= 0 &&
+      read('src/screens/MapScreen.tsx').indexOf('REPORT') >= 0 &&
+      exists('assets/intel/unit.png'),
+    detail: 'native IntelSheet + REPORT dock + PNG',
+  });
+  extra.push({
+    id: 'NATIVE_MAP_DOCK',
+    vector: 'hud',
+    weight: 3,
+    ok:
+      read('src/screens/MapScreen.tsx').indexOf('SET DESTINATION') >= 0 &&
+      read('src/navigation/RootNavigator.tsx').indexOf('MarkerSheet') >= 0 &&
+      read('src/navigation/RootNavigator.tsx').indexOf('IntelSheet') >= 0,
+    detail: 'dock + sheets mounted',
+  });
+  extra.push({
+    id: 'INTEL_TTL_PRUNE',
+    vector: 'engine',
+    weight: 3,
+    ok: (() => {
+      const sample = (ts: number): SpIntelPin => ({
+        id: 'x',
+        type: 'collision',
+        subtype: 'major',
+        label: 'COLLISION',
+        note: '',
+        color: '#ff3d3d',
+        lat: 37.76,
+        lon: -89.33,
+        source: 'gps',
+        ts,
+      });
+      const now = Date.now();
+      return spPruneIntel([sample(now - 4 * 60 * 60 * 1000)], now).length === 0 && spPruneIntel([sample(now)], now).length === 1;
+    })(),
+    detail: '3h TTL drops expired pins',
   });
   extra.push({
     id: 'README_ORG_URL',
