@@ -239,8 +239,24 @@
       paint();
     }
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(p=>onFix(p.coords.latitude, p.coords.longitude), ()=>paint(), { enableHighAccuracy:true, timeout:8000 });
+      navigator.geolocation.getCurrentPosition(p=>onFix(p.coords.latitude, p.coords.longitude), ()=>{ tryNetwork(); paint(); }, { enableHighAccuracy:true, timeout:8000 });
+    } else {
+      tryNetwork();
     }
+    function tryNetwork(){
+      if (S.gps) return;
+      fetch('https://get.geojs.io/v1/ip/geo.json').then(r=>r.ok?r.json():null).then(body=>{
+        if (S.gps || !body) return;
+        const lat = parseFloat(body.latitude), lon = parseFloat(body.longitude);
+        if (!isFinite(lat) || !isFinite(lon)) return;
+        const org = [body.organization, body.organization_name, body.asn, body.country].join(' ');
+        if (/google|amazon|aws|azure|microsoft|digitalocean|cloudflare|ovh|hetzner|linode|oracle|colo|datacenter|facebook|meta|cloud/i.test(org)) return;
+        const cc = String(body.country_code || body.country || '').toUpperCase();
+        if (cc && cc !== 'US' && cc !== 'USA' && cc.indexOf('UNITED STATES') < 0) return;
+        onFix(lat, lon);
+      }).catch(()=>{});
+    }
+    document.getElementById('btnSearch').addEventListener('click', function(){ if(!S.gps) tryNetwork(); });
     setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:false}); }, 1000);
     paint();
   </script>
