@@ -22,6 +22,12 @@ import { spPruneIntel, type SpIntelPin } from '../src/core/spVehicleIntel';
 import { spCamNext, spCamShouldReroute } from '../src/core/spCamera';
 import { parseRainViewerIndex } from '../src/core/spRadarTiles';
 import { fromArcgisBody, fromCensusBody, spMergeGeoHits } from '../src/core/spGeoParse';
+import {
+  spFormatDuration,
+  spIsDriveAroundAlert,
+  spPickStormRoute,
+  spPointInRing,
+} from '../src/core/spStormRoute';
 
 const fs = require('fs');
 const path = require('path');
@@ -369,8 +375,36 @@ extra.push({
       hud.indexOf('LongLabel') >= 0 &&
       hud.indexOf('photon.komoot.io') >= 0 &&
       hud.indexOf('camFollowPan') >= 0 &&
-      hud.indexOf('api.rainviewer.com') >= 0,
+      hud.indexOf('api.rainviewer.com') >= 0 &&
+      hud.indexOf('function metersBetween') >= 0 &&
+      hud.indexOf('table/v1/driving') >= 0 &&
+      hud.indexOf('S.remainSec') >= 0 &&
+      hud.indexOf('STORM PATH') >= 0,
     detail: 'HUD multi-geocoder without dropping camera/radar',
+  });
+  extra.push({
+    id: 'STORM_ROUTE_POLICY',
+    vector: 'engine',
+    weight: 6,
+    ok: (() => {
+      const ring = [
+        [0, 0],
+        [0, 2],
+        [2, 2],
+        [2, 0],
+        [0, 0],
+      ];
+      const inside = spPointInRing(1, 1, ring);
+      const outside = spPointInRing(5, 5, ring);
+      const heat = !spIsDriveAroundAlert('Extreme Heat Warning');
+      const torn = spIsDriveAroundAlert('Tornado Warning');
+      const picked = spPickStormRoute([
+        { index: 0, duration: 600, hits: 8, coords: [] },
+        { index: 1, duration: 720, hits: 1, coords: [] },
+      ]);
+      return inside && !outside && heat && torn && picked.index === 1 && spFormatDuration(97) === '1 min 37s';
+    })(),
+    detail: 'duration clock + storm detour picker',
   });
   extra.push({
     id: 'README_ORG_URL',
@@ -427,6 +461,20 @@ async function withRuntime(): Promise<void> {
       'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=1400%20Walnut%20St%2C%20Murphysboro%2C%20IL%2062966&benchmark=Public_AR_Current&format=json',
       '',
       80,
+    ),
+    runtimeProbe(
+      'RUNTIME_OSRM_TABLE',
+      6,
+      'https://router.project-osrm.org/table/v1/driving/-89.3351,37.7645;-89.3297,37.7635?sources=0&destinations=1&annotations=duration,distance',
+      '',
+      40,
+    ),
+    runtimeProbe(
+      'RUNTIME_OSRM_LA',
+      6,
+      'https://router.project-osrm.org/route/v1/driving/-89.3351,37.7645;-118.2428,34.0537?overview=false&steps=false',
+      '',
+      40,
     ),
   ]);
   extra.push(...probes);

@@ -176,8 +176,14 @@
       pointer-events:none;
     }
     .radar-key.under-banner { top:58px; }
-    .banner.show { display:block; }
     .banner b { display:block; letter-spacing:1px; font-size:10px; color:var(--red); }
+    .storm-path {
+      position:absolute; left:8px; right:8px; bottom:148px; z-index:530;
+      background:rgba(8,28,40,.96); border:1px solid var(--cyan); color:var(--text);
+      padding:8px 10px; font-size:11px; letter-spacing:.3px; display:none;
+    }
+    .storm-path.show { display:block; }
+    .storm-path b { display:block; letter-spacing:1px; font-size:10px; color:var(--cyan); }
     .sheet { z-index:700; }
     .sheet h3 { margin:4px 0 12px; }
     .veh-grid, .intel-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
@@ -257,6 +263,7 @@
         </div>
         <button class="gps-gate" id="gpsGate" type="button">USE MY LIVE GPS<span>Map is Murphysboro, IL — VIEW only. Device GPS is the only LIVE NWS / NOAA trigger. IP location is never GPS.</span></button>
         <div class="banner" id="alertBanner"></div>
+        <div class="storm-path" id="stormPath"></div>
         <div class="radar-key" id="radarKey">RADAR WAIT</div>
         <div class="next" id="nextHud">
           <div class="mi" id="nextMi">—</div>
@@ -512,6 +519,16 @@
       document.getElementById('radarKey').textContent = S.radarAt
         ? ('RADAR ' + new Date(S.radarAt*1000).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) + ' · NEXRAD + GLOBAL')
         : (S.radarUrl ? 'RADAR · NOAA MOSAIC' : 'RADAR WAIT');
+      const spb = document.getElementById('stormPath');
+      if (spb) {
+        if (S.stormPath) {
+          spb.innerHTML = '<b>STORM PATH</b>Verified detour · +' + S.stormPath.extraMin + ' min · avoids ' + spEsc(S.stormPath.event);
+          spb.classList.add('show');
+        } else {
+          spb.classList.remove('show');
+          spb.textContent = '';
+        }
+      }
       const img = document.getElementById('radarImg');
       const wait = document.getElementById('radarWait');
       if (S.radarUrl) {
@@ -529,7 +546,8 @@
       document.getElementById('radarCap').textContent = S.radar ? 'LIVE' : (S.radarUrl ? 'VIEW' : 'WAIT');
       if (S.dest) {
         const miles = S.route ? `${S.route.miles.toFixed(1)} mi` : 'route wait';
-        document.getElementById('nowCard').innerHTML = `<b>↑ ${miles}</b><div>${S.dest.label}</div><div class="muted">${S.gps ? (S.route ? 'LIVE ROUTE' : 'GPS LIVE · ROUTING') : (S.route ? 'VIEW ROUTE · TAP GPS TO GO LIVE' : 'DESTINATION SET · AWAITING GPS')}</div>`;
+        const etaLive = S.remainSec != null ? formatDuration(S.remainSec) : (S.route ? formatDuration(S.route.min*60) : '');
+        document.getElementById('nowCard').innerHTML = `<b>↑ ${miles}</b><div>${S.dest.label}</div><div class="muted">${S.gps ? (S.route ? 'LIVE · ' + etaLive : 'GPS LIVE · ROUTING') : (S.route ? 'VIEW ROUTE · ' + etaLive : 'DESTINATION SET · AWAITING GPS')}</div>`;
         document.getElementById('mapSearchLabel').textContent = S.dest.label;
       } else {
         document.getElementById('nowCard').innerHTML = `<b>↑</b> Set a destination to load the route`;
@@ -796,28 +814,45 @@
       }).filter(function(p){ return isFinite(p.lat) && isFinite(p.lon); });
     }
     async function searchUS(q, bias) {
+      if (!bias || !isFinite(bias.lat) || !isFinite(bias.lon)) bias = S.view || { lat: 37.7645, lon: -89.3351 };
       const enc = encodeURIComponent(q);
       const loc = bias.lon + ',' + bias.lat;
-      const arc = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&countryCode=USA&maxLocations=8&outFields=Addr_type,Match_addr,LongLabel,PlaceName,StAddr,Place_addr,City,Region,Postal&location=' + loc + '&distance=80000&SingleLine=' + enc;
+      const far = /\d/.test(q) || /,/.test(q) || /\b[A-Z]{2}\b/.test(q) || /\b(california|texas|florida|alaska|hawaii|new york)\b/i.test(q);
+      const dist = far ? '' : '&distance=150000';
+      const arc = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&countryCode=USA&maxLocations=10&outFields=Addr_type,Match_addr,LongLabel,PlaceName,StAddr,Place_addr,City,Region,Postal&location=' + loc + dist + '&SingleLine=' + enc;
       const nom = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=1&limit=8&q=' + enc;
       const pho = 'https://photon.komoot.io/api/?q=' + enc + '&lat=' + bias.lat + '&lon=' + bias.lon + '&limit=10&lang=en';
       const [a, n, p] = await Promise.all([
-        fetch(arc).then(function(r){ return r.json(); }).catch(function(){ return null; }),
-        fetch(nom, { headers: { Accept: 'application/json' } }).then(function(r){ return r.json(); }).catch(function(){ return null; }),
-        fetch(pho).then(function(r){ return r.json(); }).catch(function(){ return null; })
+        fetchJson(arc, 7000),
+        fetchJson(nom, 7000),
+        fetchJson(pho, 7000)
       ]);
       const photonHits = ((p && p.features) || []).filter(function(f){ return f && f.geometry && f.geometry.coordinates; }).map(formatPhoton).map(function(h){ h.rank = /\d/.test(h.label) ? 0 : 2; return h; });
       const merged = uniquePlaces([].concat(fromArcgis(a), fromNominatimHits(n), photonHits));
       merged.forEach(function(h){
-        const m = metersBetween(bias, { lat: h.lat, lon: h.lon });
-        const miles = m / 1609.34;
-        const dist = miles < 0.1 ? Math.round(m * 3.28084) + ' ft' : ((miles < 10 ? miles.toFixed(1) : Math.round(miles)) + ' mi');
-        if (h.sub && h.sub.indexOf(' mi') < 0 && h.sub.indexOf(' ft') < 0) h.sub = h.sub + ' · ' + dist;
-        else if (!h.sub) h.sub = dist;
-        h._m = m;
+        h._m = metersBetween(bias, { lat: h.lat, lon: h.lon });
       });
       merged.sort(function(x,y){ return (x._m||0) - (y._m||0); });
-      return merged.slice(0, 8);
+      const hits = merged.slice(0, 8);
+      if (hits.length) {
+        const path = [bias.lon + ',' + bias.lat].concat(hits.map(function(h){ return h.lon + ',' + h.lat; })).join(';');
+        const dests = hits.map(function(_,i){ return i+1; }).join(';');
+        const table = await fetchJson('https://router.project-osrm.org/table/v1/driving/' + path + '?sources=0&destinations=' + dests + '&annotations=duration,distance', 8000);
+        const durs = table && table.durations && table.durations[0];
+        const dists = table && table.distances && table.distances[0];
+        hits.forEach(function(h, i){
+          if (durs && isFinite(durs[i])) h.etaSec = durs[i];
+          if (dists && isFinite(dists[i])) h._m = dists[i];
+        });
+      }
+      hits.forEach(function(h){
+        const miles = (h._m||0) / 1609.34;
+        const distLabel = miles < 0.1 ? Math.round((h._m||0) * 3.28084) + ' ft' : ((miles < 10 ? miles.toFixed(1) : Math.round(miles)) + ' mi');
+        const eta = formatDuration(h.etaSec);
+        const base = h.sub || '';
+        h.sub = [base, distLabel, eta].filter(Boolean).join(' · ');
+      });
+      return hits;
     }
     document.getElementById('q').addEventListener('input', (e)=>{
       clearTimeout(qTimer);
@@ -825,8 +860,14 @@
         const q = e.target.value.trim();
         if (q.length<2) { document.getElementById('hits').innerHTML=''; spHits=[]; setPending(null); return; }
         document.getElementById('hits').innerHTML = '<div class="muted" style="padding:10px 0">SEARCHING US ADDRESSES</div>';
-        const bias = S.coords || S.view;
-        spHits = await searchUS(q, bias);
+        const bias = S.coords || S.view || { lat: 37.7645, lon: -89.3351 };
+        try {
+          spHits = await searchUS(q, bias);
+        } catch (err) {
+          document.getElementById('hits').innerHTML = '<div class="muted" style="padding:10px 0">SEARCH FAILED — try again</div>';
+          setPending(null);
+          return;
+        }
         if (!spHits.length) {
           document.getElementById('hits').innerHTML = '<div class="muted" style="padding:10px 0">NO MATCH — try 123 Main St, City, ST</div>';
           setPending(null);
@@ -841,7 +882,7 @@
       S.dest = place;
       document.getElementById('sheet').classList.remove('open');
       await fetchRoute(place, true);
-      toast('DRIVE TO '+place.label.toUpperCase());
+      toast(S.stormPath ? ('STORM PATH · +' + S.stormPath.extraMin + ' MIN · AVOIDS ' + S.stormPath.event) : ('DRIVE TO '+place.label.toUpperCase()));
       paint();
       setTimeout(kickMap, 80);
     }
@@ -849,32 +890,135 @@
       if (destMark) destMark.remove();
       destMark = L.circleMarker([place.lat, place.lon], { radius:7, color:'#FFAB00', fillColor:'#FFAB00', fillOpacity:.9 }).addTo(map);
       const from = S.coords || S.view;
-      const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${place.lon},${place.lat}?overview=full&geometries=geojson&steps=true`;
-      const body = await fetch(url).then(r=>r.json()).catch(()=>null);
+      const base = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${place.lon},${place.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+      let body = await fetchJson(base, 12000);
       S._routeAt = Date.now();
       S._routeFrom = { lat: from.lat, lon: from.lon };
-      if (body && body.routes && body.routes[0]) {
-        const r = body.routes[0];
-        S.route = { miles: r.distance/1609.34, min: r.duration/60 };
-        const steps = (r.legs && r.legs[0] && r.legs[0].steps) || [];
-        const step = steps.find((s) => s.distance > 40) || steps[0];
-        S.step = step ? { mi: (step.distance/1609.34).toFixed(1)+' mi', ins: (step.maneuver && step.maneuver.instruction) || 'Continue' } : null;
-        if (line) line.remove();
-        line = L.geoJSON(r.geometry, { style:{ color:'#FFAB00', weight:4 } }).addTo(map);
-        if (moveCamera) camOverview();
-        const sec = Math.round(S.route.min*60);
-        const cells = [Math.floor(sec/86400), Math.floor((sec%86400)/3600), Math.floor((sec%3600)/60), sec%60];
-        document.getElementById('eta').innerHTML = ['DAYS','HOURS','MIN','SEC'].map((l,i)=>`<div class="cell"><b>${cells[i]}</b><span>${l}</span></div>`).join('');
-      } else if (moveCamera) {
-        camProg(function(){ map.setView([place.lat, place.lon], 13, { animate:true }); });
+      if (!(body && body.routes && body.routes[0])) {
+        if (moveCamera) camProg(function(){ map.setView([place.lat, place.lon], 13, { animate:true }); });
+        return;
       }
+      const geoms = (S.alertGeoms || []).map(function(g){ return g.geom; });
+      function coordsOf(r) {
+        const c = (r.geometry && r.geometry.coordinates) || [];
+        return c.map(function(p){ return { lat: p[1], lon: p[0] }; });
+      }
+      function hitsOf(r) {
+        const coords = coordsOf(r);
+        if (!geoms.length || !coords.length) return 0;
+        const step = Math.max(1, Math.floor(coords.length / 40));
+        let n = 0;
+        for (let i = 0; i < coords.length; i += step) {
+          const p = coords[i];
+          for (let g = 0; g < geoms.length; g++) {
+            if (geomHits(geoms[g], p.lat, p.lon)) { n++; break; }
+          }
+        }
+        return n;
+      }
+      let chosen = body.routes[0];
+      let chosenHits = hitsOf(chosen);
+      S.stormPath = null;
+      if (chosenHits > 0) {
+        let best = chosen, bestHits = chosenHits;
+        for (let i = 1; i < body.routes.length; i++) {
+          const h = hitsOf(body.routes[i]);
+          if (h < bestHits && body.routes[i].duration <= chosen.duration * 1.6) {
+            best = body.routes[i]; bestHits = h;
+          }
+        }
+        if (bestHits >= chosenHits) {
+          const via = stormVia(from, place);
+          if (via) {
+            const viaUrl = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${via.lon},${via.lat};${place.lon},${place.lat}?overview=full&geometries=geojson&steps=true`;
+            const viaBody = await fetchJson(viaUrl, 12000);
+            if (viaBody && viaBody.routes && viaBody.routes[0] && hitsOf(viaBody.routes[0]) < chosenHits && viaBody.routes[0].duration <= chosen.duration * 1.6) {
+              best = viaBody.routes[0]; bestHits = hitsOf(best);
+            }
+          }
+        }
+        if (best !== chosen && bestHits < chosenHits) {
+          const extra = Math.max(0, Math.round((best.duration - chosen.duration) / 60));
+          const ev = (S.alertGeoms[0] && S.alertGeoms[0].event) || 'severe weather';
+          S.stormPath = { extraMin: extra, event: ev, hits: bestHits };
+          chosen = best;
+        }
+      }
+      const r = chosen;
+      S.route = { miles: r.distance/1609.34, min: r.duration/60 };
+      S.remainSec = Math.round(r.duration);
+      const steps = [];
+      (r.legs || []).forEach(function(leg){ (leg.steps || []).forEach(function(s){ steps.push(s); }); });
+      const step = steps.find((s) => s.distance > 40) || steps[0];
+      S.step = step ? { mi: (step.distance/1609.34).toFixed(1)+' mi', ins: (step.maneuver && step.maneuver.instruction) || 'Continue' } : null;
+      if (line) line.remove();
+      line = L.geoJSON(r.geometry, { style:{ color: S.stormPath ? '#00E5FF' : '#FFAB00', weight:4 } }).addTo(map);
+      if (moveCamera) camOverview();
+      paintEta();
     }
     function camMeters(a, b) {
-      if (!a || !b) return 0;
+      if (!a || !b || !isFinite(a.lat) || !isFinite(a.lon) || !isFinite(b.lat) || !isFinite(b.lon)) return 0;
       const R = 6371000, toR = function(d){ return d*Math.PI/180; };
       const dLat = toR(b.lat-a.lat), dLon = toR(b.lon-a.lon);
       const s = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLon/2)*Math.sin(dLon/2);
       return 2*R*Math.asin(Math.min(1, Math.sqrt(s)));
+    }
+    function metersBetween(a, b) { return camMeters(a, b); }
+    function formatDuration(sec) {
+      if (sec == null || !isFinite(sec) || sec < 0) return '';
+      sec = Math.round(sec);
+      const d = Math.floor(sec/86400), h = Math.floor((sec%86400)/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+      if (d) return d+'d '+h+'h '+m+'m';
+      if (h) return h+'h '+m+'m '+s+'s';
+      if (m) return m+' min '+s+'s';
+      return s+'s';
+    }
+    function paintEta() {
+      const sec = Math.max(0, Math.round(S.remainSec || 0));
+      const cells = [Math.floor(sec/86400), Math.floor((sec%86400)/3600), Math.floor((sec%3600)/60), sec%60];
+      document.getElementById('eta').innerHTML = ['DAYS','HOURS','MIN','SEC'].map((l,i)=>`<div class="cell"><b>${cells[i]}</b><span>${l}</span></div>`).join('');
+    }
+    function fetchJson(url, ms) {
+      const c = new AbortController();
+      const t = setTimeout(function(){ c.abort(); }, ms || 7000);
+      return fetch(url, { signal: c.signal }).then(function(r){ return r.json(); }).catch(function(){ return null; }).finally(function(){ clearTimeout(t); });
+    }
+    function pointInRing(lat, lon, ring) {
+      if (!ring || ring.length < 3) return false;
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+        const hit = ((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi);
+        if (hit) inside = !inside;
+      }
+      return inside;
+    }
+    function geomHits(geom, lat, lon) {
+      if (!geom || !geom.coordinates) return false;
+      function walk(coords) {
+        if (!coords || !coords.length) return false;
+        if (typeof coords[0][0] === 'number') return pointInRing(lat, lon, coords);
+        return coords.some(walk);
+      }
+      return walk(geom.coordinates);
+    }
+    function stormVia(from, to) {
+      const g = (S.alertGeoms || [])[0];
+      if (!g || !g.geom) return null;
+      let slat = 0, slon = 0, n = 0;
+      function acc(coords) {
+        if (!coords || !coords.length) return;
+        if (typeof coords[0] === 'number') { slon += coords[0]; slat += coords[1]; n++; return; }
+        coords.forEach(acc);
+      }
+      acc(g.geom.coordinates);
+      if (!n) return null;
+      slat /= n; slon /= n;
+      const midLat = (from.lat + to.lat) / 2, midLon = (from.lon + to.lon) / 2;
+      let dLat = midLat - slat, dLon = midLon - slon;
+      const hyp = Math.hypot(dLat, dLon) || 1;
+      const deg = 20 / 111;
+      return { lat: midLat + dLat / hyp * deg, lon: midLon + dLon / hyp * deg };
     }
     function nwsHeaders() { return { Accept:'application/geo+json', 'User-Agent': UA }; }
     async function loadAtmosphere(lat, lon, live) {
@@ -901,6 +1045,10 @@
           try { if (pr.expires) expires = new Date(pr.expires).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }); } catch (e) {}
           return { event: pr.event, severity: pr.severity, urgency: pr.urgency, headline: pr.headline, area: pr.areaDesc, expires };
         });
+        S.alertGeoms = (a.features||[]).filter(function(f){
+          const ev = (f.properties && f.properties.event) || '';
+          return /tornado|thunderstorm|flash flood|blizzard|winter storm|hurricane|cyclone|ice storm|dust storm/i.test(ev);
+        }).map(function(f){ return { event: f.properties.event, geom: f.geometry }; });
         S.last = live ? evaluate(S.alerts) : S.last;
         S.wx = !!live;
       } catch (e) { if (live) S.wx = false; }
@@ -1000,7 +1148,13 @@
     document.getElementById('gpsGate').onclick = requestGps;
     document.getElementById('btnGps').onclick = requestGps;
     document.getElementById('btnSearch').addEventListener('click', function(){ if(!S.gps) tryNetwork(); });
-    setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString(); }, 1000);
+    setInterval(()=>{
+      document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+      if (S.dest && S.remainSec != null && S.remainSec > 0 && S.gps && S.speed != null && S.speed > 0.5) {
+        S.remainSec -= 1;
+        paintEta();
+      }
+    }, 1000);
     window.addEventListener('resize', kickMap);
     if (window.visualViewport) window.visualViewport.addEventListener('resize', kickMap);
     paint();
