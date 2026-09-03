@@ -778,6 +778,11 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
       clearIntel,
       clearPlans,
       showToast,
+      setMarkerOpen,
+      setIntelOpen,
+      setVehicle,
+      postIntel,
+      deleteIntel,
       mapViewDefault: SP_MAP_VIEW_DEFAULT,
     }),
     [

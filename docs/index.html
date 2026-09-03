@@ -127,6 +127,7 @@
     .sheet.open { display:block; }
     input { width:100%; min-height:48px; background:var(--bg); color:var(--text); border:1px solid var(--border); padding:0 12px; }
     .hit { padding:12px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+    .hit.active { background:#0C1C24; }
     .toast {
       display:none; position:absolute; left:16px; right:16px; bottom:88px;
       background:#0C1C24; border:1px solid var(--cyan); color:var(--cyan);
@@ -155,8 +156,10 @@
     .toggle { border:1px solid var(--cyan); background:transparent; color:var(--cyan); min-width:64px; min-height:36px; font-weight:800; }
     .dock-btn { position:relative; }
     .dock-btn img { width:22px; height:22px; object-fit:contain; display:block; margin:0 auto 2px; }
+    .leaflet-control-attribution { display:none !important; }
+    .leaflet-control-zoom { display:none !important; }
     .banner {
-      position:absolute; top:54px; left:8px; right:8px; z-index:520;
+      position:absolute; top:8px; left:8px; right:52px; z-index:520;
       background:rgba(40,8,8,.94); border:1px solid var(--red); color:#ffd7d7;
       padding:8px 10px; font-size:11px; letter-spacing:.4px; display:none;
     }
@@ -290,6 +293,11 @@
         <h3 style="margin:4px 0 12px">Set destination</h3>
         <input id="q" placeholder="Town, state, or full US address" />
         <div id="hits"></div>
+        <div id="pendingBox" hidden>
+          <div id="pendingLabel" style="font-weight:800;margin-top:10px"></div>
+          <div id="pendingSub" class="muted" style="margin:4px 0 8px"></div>
+          <button class="btn primary" id="goDrive" type="button">START DRIVE</button>
+        </div>
         <button class="btn ghost" id="closeSheet">CLOSE</button>
       </div>
       <div class="sheet" id="vehSheet">
@@ -469,7 +477,7 @@
         document.getElementById('nowCard').innerHTML = `<b>↑</b> Set a destination to load the route`;
         document.getElementById('mapSearchLabel').textContent = 'Town, state, or address';
       }
-      document.getElementById('nextMi').textContent = S.step ? S.step.mi : (S.route ? S.route.miles.toFixed(1)+' mi' : '—');
+      document.getElementById('nextMi').textContent = S.step ? S.step.mi : (S.route ? S.route.miles.toFixed(1)+' mi' : (S.gps ? 'LIVE' : 'VIEW'));
       document.getElementById('nextIns').textContent = S.step ? S.step.ins : (S.dest ? 'Head toward destination' : 'Set a destination');
       document.getElementById('nextDst').textContent = S.dest ? S.dest.label : 'SEARCH TO NAVIGATE';
       const mph = (S.speed!=null && isFinite(S.speed) && S.speed>=0) ? Math.round(S.speed*2.236936) : null;
@@ -639,26 +647,54 @@
     document.getElementById('vehBack').onclick = () => { S.vehView = null; renderVehSheet(); };
     document.getElementById('postIntel').onclick = postIntel;
     document.getElementById('clearIntel').onclick = () => { lsWrite(LS_INTEL, []); renderIntelMarkers(); toast('INTEL CLEARED'); };
-    let qTimer, spHits = [];
+    let qTimer, spHits = [], spPending = null;
+    function formatPhoton(f) {
+      const p = (f && f.properties) || {};
+      const name = p.name || '';
+      const city = p.city || p.locality || '';
+      const state = p.state || '';
+      const street = [p.housenumber, p.street].filter(Boolean).join(' ');
+      const label = name && city && state && name !== city
+        ? name + ', ' + city + ', ' + state
+        : name && state ? name + ', ' + state : (name || street || 'Place');
+      const sub = [street && name ? street : '', city, state].filter(Boolean).join(', ');
+      return { label, sub, lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
+    }
+    function uniquePlaces(list) {
+      const out = [];
+      list.forEach((p) => {
+        const dup = out.some((q) => Math.abs(q.lat - p.lat) < 0.0003 && Math.abs(q.lon - p.lon) < 0.0003);
+        if (!dup) out.push(p);
+      });
+      return out;
+    }
+    function setPending(place) {
+      spPending = place;
+      document.getElementById('pendingBox').hidden = !place;
+      document.getElementById('pendingLabel').textContent = place ? place.label : '';
+      document.getElementById('pendingSub').textContent = place ? (place.sub || (place.lat.toFixed(4)+', '+place.lon.toFixed(4))) : '';
+      document.querySelectorAll('#hits .hit').forEach((el, i) => {
+        el.classList.toggle('active', !!(place && spHits[i] && spHits[i].lat === place.lat && spHits[i].lon === place.lon));
+      });
+    }
     document.getElementById('hits').addEventListener('click', (e) => {
       const el = e.target.closest('.hit');
       if (!el) return;
       const place = spHits[+el.dataset.i];
-      if (place) startDrive(place);
+      if (place) setPending(place);
     });
+    document.getElementById('goDrive').onclick = () => { if (spPending) startDrive(spPending); };
     document.getElementById('q').addEventListener('input', (e)=>{
       clearTimeout(qTimer);
       qTimer = setTimeout(async ()=>{
         const q = e.target.value.trim();
-        if (q.length<2) { document.getElementById('hits').innerHTML=''; spHits=[]; return; }
+        if (q.length<2) { document.getElementById('hits').innerHTML=''; spHits=[]; setPending(null); return; }
         const bias = S.coords || S.view;
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${bias.lat}&lon=${bias.lon}&limit=6&lang=en`;
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${bias.lat}&lon=${bias.lon}&limit=8&lang=en`;
         const body = await fetch(url).then(r=>r.json()).catch(()=>null);
-        spHits = ((body&&body.features)||[]).map(f=>({
-          label: (f.properties&& (f.properties.name || 'Place')) + (f.properties.state ? ', '+f.properties.state : ''),
-          lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0]
-        }));
-        document.getElementById('hits').innerHTML = spHits.map((h,i)=>`<div class="hit" data-i="${i}"><b>${h.label}</b></div>`).join('');
+        spHits = uniquePlaces(((body&&body.features)||[]).filter(f=>f&&f.geometry&&f.geometry.coordinates).map(formatPhoton)).slice(0,6);
+        document.getElementById('hits').innerHTML = spHits.map((h,i)=>`<div class="hit" data-i="${i}"><b>${spEsc(h.label)}</b><div class="muted">${spEsc(h.sub || h.lat.toFixed(4)+', '+h.lon.toFixed(4))}</div></div>`).join('');
+        setPending(null);
       }, 280);
     });
     async function startDrive(place) {

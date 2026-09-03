@@ -202,6 +202,34 @@ extra.push({
     detail: '3h TTL drops expired pins',
   });
   extra.push({
+    id: 'HUD_SEARCH_UNIQUE',
+    vector: 'hud',
+    weight: 4,
+    ok:
+      hud.indexOf('function uniquePlaces') >= 0 &&
+      hud.indexOf('function formatPhoton') >= 0 &&
+      hud.indexOf('START DRIVE') >= 0 &&
+      hud.indexOf('housenumber') >= 0,
+    detail: 'Photon street/city labels + dedupe + START DRIVE',
+  });
+  extra.push({
+    id: 'HUD_LEAFLET_NOT_ON_DOCK',
+    vector: 'hud',
+    weight: 3,
+    ok: hud.indexOf('.leaflet-control-attribution { display:none') >= 0 && hud.indexOf('right:52px') >= 0,
+    detail: 'OSM credit not over dock; banner clears zoom',
+  });
+  extra.push({
+    id: 'NATIVE_STORE_SHEET_API',
+    vector: 'hud',
+    weight: 4,
+    ok:
+      read('src/state/StormPathStore.tsx').indexOf('setMarkerOpen,') >= 0 &&
+      read('src/state/StormPathStore.tsx').indexOf('postIntel,') >= 0 &&
+      read('src/state/StormPathStore.tsx').indexOf('deleteIntel,') >= 0,
+    detail: 'context exports sheet methods',
+  });
+  extra.push({
     id: 'README_ORG_URL',
     vector: 'github',
     weight: 3,
