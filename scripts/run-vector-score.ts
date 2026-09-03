@@ -19,6 +19,7 @@ declare function fetch(
 
 import { formatVectorReport, scoreVector, type VectorCheck } from '../src/core/vectorScore';
 import { spPruneIntel, type SpIntelPin } from '../src/core/spVehicleIntel';
+import { spCamNext, spCamShouldReroute } from '../src/core/spCamera';
 
 const fs = require('fs');
 const path = require('path');
@@ -228,6 +229,52 @@ extra.push({
       read('src/state/StormPathStore.tsx').indexOf('postIntel,') >= 0 &&
       read('src/state/StormPathStore.tsx').indexOf('deleteIntel,') >= 0,
     detail: 'context exports sheet methods',
+  });
+  extra.push({
+    id: 'CAM_POLICY_FOLLOW_PANS',
+    vector: 'engine',
+    weight: 6,
+    ok:
+      spCamNext('follow', { type: 'gps' }).action === 'pan' &&
+      spCamNext('browse', { type: 'gps' }).action === 'none' &&
+      spCamNext('follow', { type: 'user_gesture' }).mode === 'browse' &&
+      spCamNext('browse', { type: 'start_drive' }).action === 'overview' &&
+      spCamNext('browse', { type: 'recenter' }).mode === 'follow',
+    detail: 'GPS pans in follow, never while browsing; drive overview; recenter',
+  });
+  extra.push({
+    id: 'CAM_POLICY_REROUTE',
+    vector: 'engine',
+    weight: 3,
+    ok: (() => {
+      const t = 1_000_000;
+      return !spCamShouldReroute(t, t + 1000, 10) && spCamShouldReroute(t, t + 31_000, 10) && spCamShouldReroute(t, t + 1000, 300);
+    })(),
+    detail: 'reroute only after 250m or 30s',
+  });
+  extra.push({
+    id: 'HUD_CAM_NO_GPS_STEAL',
+    vector: 'hud',
+    weight: 8,
+    ok:
+      hud.indexOf("cam:{ mode:'follow'") >= 0 &&
+      hud.indexOf('camFollowPan') >= 0 &&
+      hud.indexOf('minZoom:2') >= 0 &&
+      hud.indexOf('id="recenter"') >= 0 &&
+      hud.indexOf('if (S.dest) await startDrive') < 0 &&
+      hud.indexOf('map.setView([lat,lon], 14)') < 0,
+    detail: 'GPS ticks pan only; startDrive not in onFix; world minZoom 2',
+  });
+  extra.push({
+    id: 'NATIVE_CAM_UNCONTROLLED',
+    vector: 'hud',
+    weight: 5,
+    ok:
+      read('src/screens/MapScreen.tsx').indexOf('followCam') >= 0 &&
+      read('src/screens/MapScreen.tsx').indexOf('minZoomLevel={2}') >= 0 &&
+      read('src/screens/MapScreen.tsx').indexOf('onPanDrag') >= 0 &&
+      read('src/screens/MapScreen.tsx').indexOf('region={region}') < 0,
+    detail: 'native map is not a controlled region',
   });
   extra.push({
     id: 'README_ORG_URL',

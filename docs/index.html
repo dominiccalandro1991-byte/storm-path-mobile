@@ -82,6 +82,10 @@
       width:36px; height:36px; border:1px solid var(--cyan);
       background:rgba(6,13,20,.92); color:var(--cyan); font-size:18px; font-weight:800;
     }
+    #recenter {
+      width:auto; min-width:36px; height:auto; min-height:36px; padding:4px 6px;
+      font-size:8px; letter-spacing:.6px; line-height:1.1;
+    }
     .next {
       position:absolute; left:10px; right:90px; bottom:72px; z-index:500;
       background:rgba(6,13,20,.92); border:1px solid var(--amber); border-left:4px solid var(--amber);
@@ -129,7 +133,7 @@
     .hit { padding:12px 0; border-bottom:1px solid var(--border); cursor:pointer; }
     .hit.active { background:#0C1C24; }
     .toast {
-      display:none; position:absolute; left:16px; right:16px; bottom:88px;
+      display:none; position:absolute; left:16px; right:70px; top:96px; bottom:auto;
       background:#0C1C24; border:1px solid var(--cyan); color:var(--cyan);
       text-align:center; padding:10px; z-index:800; letter-spacing:1px; font-weight:700; font-size:12px;
     }
@@ -240,6 +244,7 @@
         <div class="zooms">
           <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
           <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+          <button type="button" id="recenter" hidden>RECENTER</button>
         </div>
         <button class="gps-gate" id="gpsGate" type="button">USE MY LIVE GPS<span>Map is Murphysboro, IL — VIEW only. Device GPS is the only LIVE NWS / NOAA trigger. IP location is never GPS.</span></button>
         <div class="banner" id="alertBanner"></div>
@@ -399,13 +404,50 @@
       for (const a of list) { const c = classify(a); if (RANK[c] > RANK[worst]) worst = c; }
       return worst;
     }
-    const S = { screen:'map', gps:false, wx:false, radar:false, last:null, coords:null, view:{ lat:VIEW.lat, lon:VIEW.lon, why:'murphysboro' }, dest:null, route:null, hourly:null, hours:[], alerts:[], radarUrl:null, speed:null, step:null, units:'MPH', vehView:null, intelPick:null };
-    const map = L.map('map', { zoomControl:false }).setView([VIEW.lat, VIEW.lon], 13);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap', className:'sp-base-tiles' }).addTo(map);
+    const S = { screen:'map', gps:false, wx:false, radar:false, last:null, coords:null, view:{ lat:VIEW.lat, lon:VIEW.lon, why:'murphysboro' }, dest:null, route:null, hourly:null, hours:[], alerts:[], radarUrl:null, speed:null, step:null, units:'MPH', vehView:null, intelPick:null, cam:{ mode:'follow', prog:false } };
+    const map = L.map('map', { zoomControl:false, minZoom:2, maxZoom:19, worldCopyJump:true }).setView([VIEW.lat, VIEW.lon], 13);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { minZoom:2, maxZoom:19, attribution:'&copy; OpenStreetMap', className:'sp-base-tiles' }).addTo(map);
     const intelLayer = L.layerGroup().addTo(map);
     let marker = null, destMark = null, line = null, radarLayer = null, watchId = null;
     function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2400); }
     function kickMap() { try { map.invalidateSize(); } catch (e) {} }
+    function camShowRecenter() {
+      const el = document.getElementById('recenter');
+      if (el) el.hidden = S.cam.mode === 'follow';
+    }
+    function camProg(fn) {
+      S.cam.prog = true;
+      try { fn(); } finally { setTimeout(function(){ S.cam.prog = false; }, 80); }
+    }
+    function camUserGesture() {
+      if (S.cam.prog) return;
+      S.cam.mode = 'browse';
+      camShowRecenter();
+    }
+    function camFollowPan() {
+      if (S.cam.mode !== 'follow' || !S.coords) return;
+      camProg(function(){ map.panTo([S.coords.lat, S.coords.lon], { animate:false }); });
+    }
+    function camFollowZoom() {
+      const c = S.coords || S.view;
+      S.cam.mode = 'follow';
+      camShowRecenter();
+      camProg(function(){ map.setView([c.lat, c.lon], 16, { animate:true }); });
+    }
+    function camOverview() {
+      S.cam.mode = 'follow';
+      camShowRecenter();
+      if (line) {
+        camProg(function(){ map.fitBounds(line.getBounds(), { padding:[70,90], maxZoom:16, animate:true }); });
+        setTimeout(function(){
+          if (S.cam.mode === 'follow' && S.coords) camFollowZoom();
+        }, 1600);
+      } else if (S.coords) {
+        camFollowZoom();
+      }
+    }
+    map.on('zoomstart', camUserGesture);
+    map.on('dragstart', camUserGesture);
     function paint() {
       const state = spComputeNextState(S.gps, S.wx, S.radar, S.last);
       const label = state === 'safe' ? 'SAFE MODE' : state.toUpperCase();
@@ -500,8 +542,9 @@
     document.getElementById('btnSearch').onclick = openSheet;
     document.getElementById('mapSearch').onclick = openSheet;
     document.getElementById('closeSheet').onclick = ()=>document.getElementById('sheet').classList.remove('open');
-    document.getElementById('zoomIn').onclick = ()=>map.zoomIn();
-    document.getElementById('zoomOut').onclick = ()=>map.zoomOut();
+    document.getElementById('zoomIn').onclick = function(){ S.cam.mode='browse'; camShowRecenter(); map.zoomIn(); };
+    document.getElementById('zoomOut').onclick = function(){ S.cam.mode='browse'; camShowRecenter(); map.zoomOut(); };
+    document.getElementById('recenter').onclick = function(){ camFollowZoom(); };
     document.getElementById('setUnits').onclick = function(){ S.units = S.units==='MPH'?'KMH':'MPH'; this.textContent=S.units; };
     function findVeh(id) {
       for (const sec of VEH_SECTIONS) {
@@ -701,11 +744,19 @@
       if (!place || !isFinite(place.lat) || !isFinite(place.lon)) return;
       S.dest = place;
       document.getElementById('sheet').classList.remove('open');
+      await fetchRoute(place, true);
+      toast('DRIVE TO '+place.label.toUpperCase());
+      paint();
+      setTimeout(kickMap, 80);
+    }
+    async function fetchRoute(place, moveCamera) {
       if (destMark) destMark.remove();
       destMark = L.circleMarker([place.lat, place.lon], { radius:7, color:'#FFAB00', fillColor:'#FFAB00', fillOpacity:.9 }).addTo(map);
       const from = S.coords || S.view;
       const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${place.lon},${place.lat}?overview=full&geometries=geojson&steps=true`;
       const body = await fetch(url).then(r=>r.json()).catch(()=>null);
+      S._routeAt = Date.now();
+      S._routeFrom = { lat: from.lat, lon: from.lon };
       if (body && body.routes && body.routes[0]) {
         const r = body.routes[0];
         S.route = { miles: r.distance/1609.34, min: r.duration/60 };
@@ -714,16 +765,20 @@
         S.step = step ? { mi: (step.distance/1609.34).toFixed(1)+' mi', ins: (step.maneuver && step.maneuver.instruction) || 'Continue' } : null;
         if (line) line.remove();
         line = L.geoJSON(r.geometry, { style:{ color:'#FFAB00', weight:4 } }).addTo(map);
-        try { map.fitBounds(line.getBounds(), { padding:[40,40] }); } catch(e) { map.setView([place.lat, place.lon], 13); }
+        if (moveCamera) camOverview();
         const sec = Math.round(S.route.min*60);
         const cells = [Math.floor(sec/86400), Math.floor((sec%86400)/3600), Math.floor((sec%3600)/60), sec%60];
         document.getElementById('eta').innerHTML = ['DAYS','HOURS','MIN','SEC'].map((l,i)=>`<div class="cell"><b>${cells[i]}</b><span>${l}</span></div>`).join('');
-      } else {
-        map.setView([place.lat, place.lon], 13);
+      } else if (moveCamera) {
+        camProg(function(){ map.setView([place.lat, place.lon], 13, { animate:true }); });
       }
-      toast('DRIVE TO '+place.label.toUpperCase());
-      paint();
-      setTimeout(kickMap, 80);
+    }
+    function camMeters(a, b) {
+      if (!a || !b) return 0;
+      const R = 6371000, toR = function(d){ return d*Math.PI/180; };
+      const dLat = toR(b.lat-a.lat), dLon = toR(b.lon-a.lon);
+      const s = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLon/2)*Math.sin(dLon/2);
+      return 2*R*Math.asin(Math.min(1, Math.sqrt(s)));
     }
     function nwsHeaders() { return { Accept:'application/geo+json', 'User-Agent': UA }; }
     async function loadAtmosphere(lat, lon, live) {
@@ -762,6 +817,7 @@
       paint();
     }
     async function onFix(lat, lon, speed) {
+      const first = !S.gps;
       S.gps = true; S.coords = { lat, lon };
       if (speed!=null && isFinite(speed)) S.speed = speed;
       if (!marker) {
@@ -773,9 +829,21 @@
         marker.setLatLng([lat,lon]);
         applyVehMarker();
       }
-      map.setView([lat,lon], 14);
-      await loadAtmosphere(lat, lon, true);
-      if (S.dest) await startDrive(S.dest);
+      camFollowPan();
+      if (first) {
+        S.cam.mode = 'follow';
+        camShowRecenter();
+        await loadAtmosphere(lat, lon, true);
+      } else if (!S._wxAt || Date.now() - S._wxAt > 5*60*1000) {
+        S._wxAt = Date.now();
+        loadAtmosphere(lat, lon, true);
+      }
+      if (S.dest) {
+        const moved = camMeters(S._routeFrom, S.coords);
+        const stale = !S._routeAt || Date.now() - S._routeAt > 30000;
+        if (moved >= 250 || stale) await fetchRoute(S.dest, false);
+      }
+      paint();
     }
     function applyView(lat, lon, why) {
       if (S.gps) return;

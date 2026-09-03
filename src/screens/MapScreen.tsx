@@ -1,10 +1,11 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, Overlay, Polyline, PROVIDER_DEFAULT, UrlTile, type Region } from 'react-native-maps';
+import MapView, { Marker, Overlay, Polyline, PROVIDER_DEFAULT, UrlTile } from 'react-native-maps';
 import { SP_COLOR } from '../theme';
 import { formatSpeed, useStormPath } from '../state/StormPathStore';
 import { radarBoundsFromFix } from '../net/spRadar';
 import { VEHICLE_IMAGES, INTEL_IMAGES } from '../ui/markerAssets';
+import { SP_CAM_FOLLOW_ZOOM } from '../core/spCamera';
 
 const OSM_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
@@ -19,6 +20,9 @@ export function MapScreen(): React.ReactElement {
     requestGps,
     deleteIntel,
   } = useStormPath();
+  const mapRef = useRef<MapView>(null);
+  const [followCam, setFollowCam] = useState(true);
+  const lastDest = useRef<string | null>(null);
 
   const onLayout = useCallback(
     (event: { nativeEvent: { layout: { width: number; height: number } } }) => {
@@ -28,14 +32,52 @@ export function MapScreen(): React.ReactElement {
     [markMapLayout],
   );
 
-  const region: Region = snapshot.coords
-    ? {
-        latitude: snapshot.coords.latitude,
-        longitude: snapshot.coords.longitude,
-        latitudeDelta: snapshot.driving ? 0.06 : 0.08,
-        longitudeDelta: snapshot.driving ? 0.06 : 0.08,
-      }
-    : { ...mapViewDefault };
+  useEffect(() => {
+    if (!followCam || !snapshot.coords) {
+      return;
+    }
+    void mapRef.current?.animateCamera(
+      {
+        center: { latitude: snapshot.coords.latitude, longitude: snapshot.coords.longitude },
+      },
+      { duration: 180 },
+    );
+  }, [followCam, snapshot.coords]);
+
+  useEffect(() => {
+    const key = snapshot.destination
+      ? `${snapshot.destination.label}:${snapshot.route?.geometry.length ?? 0}`
+      : null;
+    if (!key || key === lastDest.current) {
+      return;
+    }
+    const geo = snapshot.route?.geometry ?? [];
+    if (geo.length < 2) {
+      return;
+    }
+    lastDest.current = key;
+    setFollowCam(true);
+    if (geo.length > 1) {
+      mapRef.current?.fitToCoordinates(geo, {
+        edgePadding: { top: 80, right: 48, bottom: 160, left: 24 },
+        animated: true,
+      });
+      const t = setTimeout(() => {
+        if (!snapshot.coords) {
+          return;
+        }
+        void mapRef.current?.animateCamera(
+          {
+            center: { latitude: snapshot.coords.latitude, longitude: snapshot.coords.longitude },
+            zoom: SP_CAM_FOLLOW_ZOOM,
+          },
+          { duration: 500 },
+        );
+      }, 1600);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [snapshot.coords, snapshot.destination, snapshot.route]);
 
   const bounds = snapshot.coords
     ? radarBoundsFromFix(snapshot.coords.latitude, snapshot.coords.longitude)
@@ -53,15 +95,32 @@ export function MapScreen(): React.ReactElement {
   const routeCoords = useMemo(() => snapshot.route?.geometry ?? [], [snapshot.route]);
   const vehicleSrc = snapshot.vehicleId ? VEHICLE_IMAGES[snapshot.vehicleId] : undefined;
 
+  function recenter() {
+    setFollowCam(true);
+    if (!snapshot.coords) {
+      return;
+    }
+    void mapRef.current?.animateCamera(
+      {
+        center: { latitude: snapshot.coords.latitude, longitude: snapshot.coords.longitude },
+        zoom: SP_CAM_FOLLOW_ZOOM,
+      },
+      { duration: 400 },
+    );
+  }
+
   return (
     <View style={styles.page} onLayout={onLayout}>
       <MapView
+        ref={mapRef}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
         mapType="none"
         initialRegion={{ ...mapViewDefault }}
-        region={region}
         rotateEnabled={false}
+        minZoomLevel={2}
+        maxZoomLevel={19}
+        onPanDrag={() => setFollowCam(false)}
       >
         <UrlTile urlTemplate={OSM_TILE} maximumZ={19} tileSize={256} />
         {snapshot.coords ? (
@@ -118,6 +177,12 @@ export function MapScreen(): React.ReactElement {
             First finite device fix is the only legal NWS / NOAA trigger. Map opens on Murphysboro as a view
             default only. IP location is never GPS.
           </Text>
+        </Pressable>
+      ) : null}
+
+      {!followCam ? (
+        <Pressable style={styles.recenter} onPress={recenter}>
+          <Text style={styles.recenterText}>RECENTER</Text>
         </Pressable>
       ) : null}
 
@@ -181,6 +246,18 @@ const styles = StyleSheet.create({
   },
   gpsGateTitle: { color: SP_COLOR.cyan, fontWeight: '800', letterSpacing: 1.2 },
   gpsGateCopy: { color: SP_COLOR.muted, fontSize: 12, lineHeight: 18 },
+  recenter: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    minHeight: 36,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: SP_COLOR.cyan,
+    backgroundColor: 'rgba(7,11,16,0.94)',
+    justifyContent: 'center',
+  },
+  recenterText: { color: SP_COLOR.cyan, fontSize: 9, letterSpacing: 0.8, fontWeight: '800' },
   hudNext: {
     position: 'absolute',
     left: 12,
