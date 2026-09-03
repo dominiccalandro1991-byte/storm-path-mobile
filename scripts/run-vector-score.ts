@@ -23,6 +23,13 @@ import { spCamNext, spCamShouldReroute } from '../src/core/spCamera';
 import { parseRainViewerIndex } from '../src/core/spRadarTiles';
 import { fromArcgisBody, fromCensusBody, spMergeGeoHits } from '../src/core/spGeoParse';
 import {
+  fromFemaDisasters,
+  fromFemaShelters,
+  fromIdotClosures,
+  fromIdotIncidents,
+  spFilterDismissed,
+} from '../src/core/spSourceReports';
+import {
   spFormatDuration,
   spIsDriveAroundAlert,
   spPickStormRoute,
@@ -407,6 +414,43 @@ extra.push({
     detail: 'duration clock + storm detour picker',
   });
   extra.push({
+    id: 'SOURCE_REPORT_PARSE',
+    vector: 'engine',
+    weight: 6,
+    ok: (() => {
+      const dot = fromIdotIncidents({
+        features: [{ attributes: { OBJECTID: 1, TRAFFIC_ITEM_TYPE_DESC: 'ROAD_CLOSURE', ORIGIN: 'I-57', START_TIME: 1788475005000 } }],
+      });
+      const clo = fromIdotClosures({
+        features: [{ attributes: { ID: 'x', Location: 'Ramp closed', ClosureType: 'ROAD_CLOSED', StartDate: 1785618125040 } }],
+      });
+      const fema = fromFemaDisasters({
+        DisasterDeclarationsSummaries: [{ disasterNumber: 4819, declarationTitle: 'SEVERE STORMS', state: 'IL', declarationDate: '2024-09-20T00:00:00.000Z' }],
+      });
+      const sh = fromFemaShelters({
+        features: [{ attributes: { shelter_name: 'Dunbar Gym', city: 'Livingston', state: 'TX', shelter_status: 'OPEN' } }],
+      });
+      const vis = spFilterDismissed(dot, ['dot-1']);
+      return dot.length === 1 && clo[0].source === 'ROAD CLOSURES' && fema[0].id === 'fema-4819' && sh[0].title === 'Dunbar Gym' && vis.length === 0;
+    })(),
+    detail: 'IDOT + FEMA report parsers + dismiss',
+  });
+  extra.push({
+    id: 'HUD_SOURCE_RAIL',
+    vector: 'hud',
+    weight: 8,
+    ok:
+      hud.indexOf('id="srcRail"') >= 0 &&
+      hud.indexOf('ClosureIncidents') >= 0 &&
+      hud.indexOf('OpenShelters') >= 0 &&
+      hud.indexOf('DisasterDeclarationsSummaries') >= 0 &&
+      hud.indexOf('Illinois_Roadway_Incidents') >= 0 &&
+      hud.indexOf('function loadOfficialSources') >= 0 &&
+      hud.indexOf('camFollowPan') >= 0 &&
+      hud.indexOf('api.rainviewer.com') >= 0,
+    detail: 'source rail + official feeds, camera/radar kept',
+  });
+  extra.push({
     id: 'README_ORG_URL',
     vector: 'github',
     weight: 3,
@@ -461,6 +505,27 @@ async function withRuntime(): Promise<void> {
       'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=1400%20Walnut%20St%2C%20Murphysboro%2C%20IL%2062966&benchmark=Public_AR_Current&format=json',
       '',
       80,
+    ),
+    runtimeProbe(
+      'RUNTIME_IDOT_INCIDENTS',
+      6,
+      'https://services2.arcgis.com/aIrBD8yn1TDTEXoz/arcgis/rest/services/Illinois_Roadway_Incidents/FeatureServer/0/query?where=1%3D1&outFields=OBJECTID&resultRecordCount=1&f=json',
+      '',
+      40,
+    ),
+    runtimeProbe(
+      'RUNTIME_IDOT_CLOSURES',
+      6,
+      'https://services2.arcgis.com/aIrBD8yn1TDTEXoz/arcgis/rest/services/ClosureIncidents/FeatureServer/0/query?where=1%3D1&outFields=OBJECTID&resultRecordCount=1&f=json',
+      '',
+      40,
+    ),
+    runtimeProbe(
+      'RUNTIME_FEMA_SHELTERS',
+      6,
+      'https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/MapServer/0/query?where=1%3D1&outFields=shelter_name,state&resultRecordCount=1&f=json',
+      '',
+      40,
     ),
     runtimeProbe(
       'RUNTIME_OSRM_TABLE',
