@@ -153,6 +153,48 @@
     .row b { display:block; }
     .row span { color:var(--muted); font-size:12px; }
     .toggle { border:1px solid var(--cyan); background:transparent; color:var(--cyan); min-width:64px; min-height:36px; font-weight:800; }
+    .dock-btn { position:relative; }
+    .dock-btn img { width:22px; height:22px; object-fit:contain; display:block; margin:0 auto 2px; }
+    .banner {
+      position:absolute; top:54px; left:8px; right:8px; z-index:520;
+      background:rgba(40,8,8,.94); border:1px solid var(--red); color:#ffd7d7;
+      padding:8px 10px; font-size:11px; letter-spacing:.4px; display:none;
+    }
+    .banner.show { display:block; }
+    .banner b { display:block; letter-spacing:1px; font-size:10px; color:var(--red); }
+    .sheet { z-index:700; }
+    .sheet h3 { margin:4px 0 12px; }
+    .veh-grid, .intel-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+    .tile {
+      border:1px solid var(--border); background:var(--card); color:var(--text);
+      min-height:88px; padding:10px 8px 8px; text-align:left; cursor:pointer;
+    }
+    .tile.selected, .tile.active { border-color:var(--cyan); box-shadow:0 0 0 1px var(--cyan); }
+    .tile img { height:44px; width:auto; max-width:100%; object-fit:contain; display:block; margin-bottom:6px; }
+    .tile .t { display:block; font:800 10px/1 "Courier New",monospace; letter-spacing:1px; color:var(--cyan); }
+    .tile .d { display:block; color:var(--muted); font-size:11px; margin-top:3px; }
+    .chips-row { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
+    .chip-btn {
+      border:1px solid var(--border); background:transparent; color:var(--text);
+      min-height:36px; padding:0 10px; font-size:10px; letter-spacing:1px; font-weight:800;
+    }
+    .chip-btn.active { border-color:var(--cyan); color:var(--cyan); }
+    textarea {
+      width:100%; min-height:72px; margin-top:10px; background:var(--bg); color:var(--text);
+      border:1px solid var(--border); padding:10px; font:14px/1.4 "Segoe UI",sans-serif;
+    }
+    .alert-card {
+      border:1px solid var(--amber); background:rgba(255,171,0,.06); padding:12px; margin-top:10px;
+    }
+    .alert-card.sev-extreme, .alert-card.sev-severe { border-color:var(--red); background:rgba(255,61,61,.08); }
+    .alert-card .ev { font:800 13px/1.2 "Courier New",monospace; letter-spacing:.8px; }
+    .alert-card .hd { color:var(--muted); font-size:12px; margin-top:6px; }
+    .hourly { display:flex; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px; }
+    .hour { min-width:72px; border:1px solid var(--border); padding:10px 8px; text-align:center; }
+    .hour b { display:block; font-size:16px; }
+    .back { display:none; border:1px solid var(--border); background:transparent; color:var(--cyan); min-width:36px; min-height:36px; font-size:18px; }
+    .back.show { display:inline-flex; align-items:center; justify-content:center; }
+    .sheet-head { display:flex; align-items:flex-start; gap:8px; }
   </style>
 </head>
 <body>
@@ -197,6 +239,7 @@
           <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
         </div>
         <button class="gps-gate" id="gpsGate" type="button">USE MY LIVE GPS<span>Map is Murphysboro, IL — VIEW only. Device GPS is the only LIVE NWS / NOAA trigger. IP location is never GPS.</span></button>
+        <div class="banner" id="alertBanner"></div>
         <div class="next" id="nextHud">
           <div class="mi" id="nextMi">—</div>
           <div class="ins" id="nextIns">Set a destination</div>
@@ -208,7 +251,7 @@
             <small>SET DESTINATION</small>
             <span id="mapSearchLabel">Town, state, or address</span>
           </button>
-          <button class="dock-btn" id="btnMarker" type="button">MARKER</button>
+          <button class="dock-btn" id="btnMarker" type="button"><img id="vehThumb" alt="" hidden>MARKER</button>
           <button class="dock-btn amber" id="btnReport" type="button">REPORT</button>
         </div>
       </section>
@@ -224,8 +267,10 @@
         <div class="muted" style="text-align:center;font-size:11px">NWS BASE REFLECTIVITY — <span id="radarCap">VIEW</span><br>Empty circle = no precipitation returns, not a missing radar.</div>
         <div class="kicker" style="margin-top:16px">CURRENT CONDITIONS</div>
         <div class="grid" id="wxGrid"></div>
-        <div class="kicker" style="margin-top:16px">LIVE NWS ALERTS</div>
-        <div id="alerts" class="muted">VIEW · MURPHYSBORO — AWAITING GPS FOR LIVE AND-GATE</div>
+        <div class="kicker" style="margin-top:16px">NEXT HOURS</div>
+        <div class="hourly" id="hourly"></div>
+        <div class="kicker" style="margin-top:16px">NWS ALERTS</div>
+        <div id="alerts"></div>
         <div class="kicker" style="margin-top:16px">SOURCE STATUS</div>
         <div id="wxSources" class="muted"></div>
       </div></section>
@@ -236,6 +281,7 @@
         <div class="row"><div><b>Speed units</b><span>Live GPS speed from this device</span></div><button class="toggle" id="setUnits">MPH</button></div>
         <div class="row"><div><b>Map tiles</b><span>OpenStreetMap dark basemap</span></div><button class="toggle" type="button">OSM</button></div>
         <div class="row"><div><b>Storm Path 1.0.0</b><span>Live device GPS, National Weather Service, NOAA radar, OpenStreetMap, OSRM. First finite GPS fix is the only NWS / NOAA WMS trigger that can leave SAFE MODE. AND-GATE requires GPS ∧ NWS ∧ radar. IP location is never GPS.</span></div></div>
+        <div class="row"><div><b>Driver intel</b><span>Remove pins stored on this device</span></div><button class="toggle" id="clearIntel" type="button">CLEAR</button></div>
         <p><a href="privacy.html" style="color:var(--cyan)">Privacy policy</a></p>
       </div></section>
 
@@ -246,6 +292,32 @@
         <div id="hits"></div>
         <button class="btn ghost" id="closeSheet">CLOSE</button>
       </div>
+      <div class="sheet" id="vehSheet">
+        <div class="sheet-head">
+          <button class="back" id="vehBack" type="button" aria-label="Back">‹</button>
+          <div>
+            <div class="kicker" id="vehKicker">YOUR MARKER</div>
+            <h3 id="vehTitle">Choose a form</h3>
+          </div>
+          <button class="btn ghost" id="closeVeh" type="button" style="width:auto;margin:0 0 0 auto;min-height:40px;padding:0 12px">×</button>
+        </div>
+        <div id="vehHost"></div>
+        <p class="muted" id="vehNote">Tap a pack — its four markers pop up. Tap one and it stays on your GPS path.</p>
+      </div>
+      <div class="sheet" id="intelSheet">
+        <div class="sheet-head">
+          <div>
+            <div class="kicker">DRIVER INTEL</div>
+            <h3>Report what you see</h3>
+          </div>
+          <button class="btn ghost" id="closeIntel" type="button" style="width:auto;margin:0 0 0 auto;min-height:40px;padding:0 12px">×</button>
+        </div>
+        <div class="intel-grid" id="intelGrid"></div>
+        <div class="chips-row" id="intelSubs"></div>
+        <textarea id="intelNote" maxlength="140" placeholder="Optional note — shows on the pin (140 chars)"></textarea>
+        <button class="btn primary" id="postIntel" type="button" hidden>POST INTEL</button>
+        <p class="muted">Drops a pin at your live GPS fix (or map center if GPS is still acquiring). Stored on this device for 3 hours.</p>
+      </div>
       <div class="toast" id="toast"></div>
     </div>
     <div class="bottom" id="ticker">VIEW · MURPHYSBORO, IL — TAP GPS FOR LIVE NWS</div>
@@ -255,7 +327,57 @@
     const VIEW = { lat: 37.7645, lon: -89.3351 };
     const RANK = { normal:0, caution:1, danger:2, stop:3 };
     const UA = 'StormPath/1.0.0 (voltcore-org hud; https://github.com/voltcore-org/storm-path-mobile; dominic.calandro1991@yahoo.com)';
-    const SOURCES = ['NOAA','NWS','DOT','EMERG MGMT','ROAD CLOSURES','SHELTERS'];
+    const SOURCES = ['NOAA','NWS','OSM','OSRM'];
+    const LS_VEH = 'sp.vehicle.v1';
+    const LS_INTEL = 'sp.intel.v1';
+    const INTEL_TTL = 3 * 60 * 60 * 1000;
+    const VEH_SECTIONS = [
+      { id:'vortex', label:'VORTEX', desc:'Storm forms', items:[
+        { id:'blaze', label:'BLAZE', desc:'Fire funnel', url:'vehicles/blaze.png' },
+        { id:'twister', label:'TWISTER', desc:'Classic funnel', url:'vehicles/twister.png' },
+        { id:'cell', label:'CELL', desc:'Radar green', url:'vehicles/cell.png' },
+        { id:'ion', label:'ION', desc:'Plasma funnel', url:'vehicles/ion.png' }
+      ]},
+      { id:'strike', label:'STRIKE', desc:'Lightning', items:[
+        { id:'flare', label:'FLARE', desc:'Fire strike', url:'vehicles/flare.png' },
+        { id:'bolt', label:'BOLT', desc:'Cloud to ground', url:'vehicles/bolt.png' },
+        { id:'volt', label:'VOLT', desc:'Radar green', url:'vehicles/volt.png' },
+        { id:'arc', label:'ARC', desc:'Plasma strike', url:'vehicles/arc.png' }
+      ]},
+      { id:'hail', label:'HAIL', desc:'Ice cores', items:[
+        { id:'ember', label:'EMBER', desc:'Fire cores', url:'vehicles/ember.png' },
+        { id:'ice', label:'ICE', desc:'Live hail', url:'vehicles/ice.png' },
+        { id:'glow', label:'GLOW', desc:'Radar green', url:'vehicles/glow.png' },
+        { id:'nova', label:'NOVA', desc:'Plasma cores', url:'vehicles/nova.png' }
+      ]},
+      { id:'rain', label:'RAIN', desc:'Falling water', items:[
+        { id:'lava', label:'LAVA', desc:'Fire rain', url:'vehicles/lava.png' },
+        { id:'pour', label:'POUR', desc:'Live rain', url:'vehicles/pour.png' },
+        { id:'acid', label:'ACID', desc:'Radar green', url:'vehicles/acid.png' },
+        { id:'neon', label:'NEON', desc:'Plasma rain', url:'vehicles/neon.png' }
+      ]},
+      { id:'cloud', label:'CLOUD', desc:'Storm mass', items:[
+        { id:'pyro', label:'PYRO', desc:'Fire cloud', url:'vehicles/pyro.png' },
+        { id:'nimbus', label:'NIMBUS', desc:'Live storm', url:'vehicles/nimbus.png' },
+        { id:'spore', label:'SPORE', desc:'Radar green', url:'vehicles/spore.png' },
+        { id:'pulse', label:'PULSE', desc:'Plasma cloud', url:'vehicles/pulse.png' }
+      ]}
+    ];
+    const INTEL_TYPES = {
+      unit:{ label:'UNIT', desc:'Police / enforcement', color:'#7ec8ff', photo:'intel/unit.png', subtypes:[{id:'visible',label:'VISIBLE'},{id:'opposite',label:'OPPOSITE SIDE'}] },
+      collision:{ label:'COLLISION', desc:'Crash on the road', color:'#ff3d3d', photo:'intel/collision.png', subtypes:[{id:'minor',label:'MINOR'},{id:'major',label:'MAJOR'}] },
+      object:{ label:'OBJECT', desc:'Tree, tire, rock, debris', color:'#ffab00', photo:'intel/object.png', subtypes:[{id:'debris',label:'DEBRIS'},{id:'tree',label:'TREE'},{id:'tire',label:'BLOWN TIRE'},{id:'rock',label:'ROCK'}] },
+      construction:{ label:'CONSTRUCTION', desc:'Work zone', color:'#ffab00', photo:'intel/construction.png', subtypes:[] },
+      closure:{ label:'CLOSURE', desc:'Lane or road closed', color:'#ff3d3d', photo:'intel/closure.png', subtypes:[] },
+      weather:{ label:'WEATHER', desc:'Flood, hail, ice, wind', color:'#ce93d8', photo:'intel/weather.png', subtypes:[{id:'flood',label:'FLOODED ROAD'},{id:'hail',label:'HAIL'},{id:'wind',label:'HIGH WIND'},{id:'ice',label:'ICE'}] },
+      disabled:{ label:'DISABLED', desc:'Vehicle stopped', color:'#00e5ff', photo:'intel/disabled.png', subtypes:[] },
+      pothole:{ label:'SURFACE', desc:'Pothole or damage', color:'#ffab00', photo:'intel/pothole.png', subtypes:[] }
+    };
+    function spEsc(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c])); }
+    function lsRead(k, fallback) {
+      try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch (e) { return fallback; }
+    }
+    function lsWrite(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
     function spComputeNextState(g, w, r, last) { return (g && w && r) ? (last || 'normal') : 'safe'; }
     function classify(a) {
       const e = (a.event||'').toLowerCase();
@@ -269,9 +391,10 @@
       for (const a of list) { const c = classify(a); if (RANK[c] > RANK[worst]) worst = c; }
       return worst;
     }
-    const S = { screen:'map', gps:false, wx:false, radar:false, last:null, coords:null, view:{ lat:VIEW.lat, lon:VIEW.lon, why:'murphysboro' }, dest:null, route:null, hourly:null, alerts:[], radarUrl:null, speed:null, step:null, units:'MPH' };
+    const S = { screen:'map', gps:false, wx:false, radar:false, last:null, coords:null, view:{ lat:VIEW.lat, lon:VIEW.lon, why:'murphysboro' }, dest:null, route:null, hourly:null, hours:[], alerts:[], radarUrl:null, speed:null, step:null, units:'MPH', vehView:null, intelPick:null };
     const map = L.map('map', { zoomControl:false }).setView([VIEW.lat, VIEW.lon], 13);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap', className:'sp-base-tiles' }).addTo(map);
+    const intelLayer = L.layerGroup().addTo(map);
     let marker = null, destMark = null, line = null, radarLayer = null, watchId = null;
     function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2400); }
     function kickMap() { try { map.invalidateSize(); } catch (e) {} }
@@ -304,18 +427,36 @@
       document.getElementById('wxSources').textContent = `NWS · ${S.wx?'LIVE':(S.hourly?'VIEW':'WAIT')}   NOAA · ${S.radar?'LIVE':(S.radarUrl?'VIEW':'WAIT')}   OSM · CONNECTED   OSRM · ${S.route?'CONNECTED':'IDLE'}`;
       const h = S.hourly || {};
       document.getElementById('wxGrid').innerHTML = [['TEMP', h.temperature||'--'],['WIND', h.wind||'--'],['RH', h.humidity||'--'],['PRESSURE','N/A'],['VIS','N/A'],['CAPE','N/A']].map(([k,v])=>`<div class="chip"><div class="muted">${k}</div><b>${v}</b></div>`).join('');
-      document.getElementById('alerts').textContent = !S.gps
-        ? (S.alerts.length ? ('VIEW · ' + S.alerts.map(a=>`${a.event} · ${a.severity}`).join('\n')) : 'VIEW · MURPHYSBORO — AWAITING GPS FOR LIVE AND-GATE')
-        : (S.alerts.length ? S.alerts.map(a=>`${a.event} · ${a.severity}`).join('\n') : 'No active alerts at the live fix');
+      const host = document.getElementById('alerts');
+      if (!S.alerts.length) {
+        host.textContent = !S.gps ? 'VIEW · MURPHYSBORO — AWAITING GPS FOR LIVE AND-GATE' : 'No active NWS alerts at the live fix';
+      } else {
+        host.innerHTML = S.alerts.map(a => {
+          const sev = (a.severity||'Unknown').toLowerCase();
+          return `<div class="alert-card sev-${spEsc(sev)}"><div class="ev">${spEsc(a.event)} · ${spEsc(a.severity||'')}</div><div class="hd">${spEsc(a.headline || '')}</div><div class="muted" style="margin-top:6px">${spEsc(a.area||'')} ${a.expires ? ' · until '+spEsc(a.expires) : ''}</div></div>`;
+        }).join('');
+      }
+      const hoursEl = document.getElementById('hourly');
+      hoursEl.innerHTML = (S.hours||[]).slice(0,8).map(p => `<div class="hour"><span class="muted">${spEsc(p.when)}</span><b>${spEsc(p.temp)}</b><span class="muted">${spEsc(p.wind)}</span></div>`).join('') || '<div class="muted">Hourly NWS loads with the gridpoint.</div>';
+      const ban = document.getElementById('alertBanner');
+      if (S.alerts[0] && S.gps) {
+        ban.innerHTML = `<b>NWS ${spEsc(S.alerts[0].severity||'')}</b>${spEsc(S.alerts[0].event||'')}`;
+        ban.classList.add('show');
+      } else {
+        ban.classList.remove('show');
+        ban.textContent = '';
+      }
       const img = document.getElementById('radarImg');
       const wait = document.getElementById('radarWait');
       if (S.radarUrl) {
         img.src = S.radarUrl;
         img.style.display = 'block';
-        wait.textContent = S.radar ? 'NO PRECIP RETURNS · LIVE' : 'VIEW RADAR';
-        wait.style.opacity = '.85';
+        wait.style.display = S.gps && S.radar ? 'none' : 'flex';
+        wait.textContent = S.gps ? '' : 'VIEW · NOT GPS';
+        wait.style.opacity = '.9';
       } else {
         img.style.display = 'none';
+        wait.style.display = 'flex';
         wait.textContent = 'AWAITING GPS';
         wait.style.opacity = '1';
       }
@@ -335,12 +476,15 @@
       document.getElementById('spd').textContent = (S.gps && mph!=null) ? String(mph) : '--';
       const gate = document.getElementById('gpsGate');
       if (gate) gate.hidden = !!S.gps;
+      refreshVehBtn();
+      renderIntelMarkers();
     }
     function switchScreen(name) {
       if (!['driver','map','weather','settings'].includes(name) || S.screen===name) return;
       S.screen = name;
       document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active', el.id==='screen-'+name));
       document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active', b.dataset.screen===name));
+      document.querySelectorAll('.sheet').forEach(el=>el.classList.remove('open'));
       if (name==='map') setTimeout(kickMap, 50);
     }
     document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>switchScreen(b.dataset.screen));
@@ -350,9 +494,151 @@
     document.getElementById('closeSheet').onclick = ()=>document.getElementById('sheet').classList.remove('open');
     document.getElementById('zoomIn').onclick = ()=>map.zoomIn();
     document.getElementById('zoomOut').onclick = ()=>map.zoomOut();
-    document.getElementById('btnMarker').onclick = ()=>toast('MARKER · CYAN FIX');
-    document.getElementById('btnReport').onclick = ()=>toast('REPORT SAVED ON DEVICE');
     document.getElementById('setUnits').onclick = function(){ S.units = S.units==='MPH'?'KMH':'MPH'; this.textContent=S.units; };
+    function findVeh(id) {
+      for (const sec of VEH_SECTIONS) {
+        const it = sec.items.find(x => x.id === id);
+        if (it) return it;
+      }
+      return null;
+    }
+    function refreshVehBtn() {
+      const thumb = document.getElementById('vehThumb');
+      const v = findVeh(lsRead(LS_VEH, null));
+      if (v) { thumb.src = v.url; thumb.hidden = false; }
+      else { thumb.removeAttribute('src'); thumb.hidden = true; }
+    }
+    function vehIcon() {
+      const v = findVeh(lsRead(LS_VEH, null));
+      if (!v) return null;
+      return L.icon({ iconUrl: v.url, iconSize:[42,64], iconAnchor:[21,62], popupAnchor:[0,-56] });
+    }
+    function applyVehMarker() {
+      const ic = vehIcon();
+      if (!marker || !ic) return;
+      if (marker.setIcon) marker.setIcon(ic);
+    }
+    function renderVehSheet() {
+      const host = document.getElementById('vehHost');
+      const back = document.getElementById('vehBack');
+      const cur = lsRead(LS_VEH, null);
+      const pack = S.vehView ? VEH_SECTIONS.find(s => s.id === S.vehView) : null;
+      if (pack) {
+        back.classList.add('show');
+        document.getElementById('vehKicker').textContent = 'YOUR MARKER · ' + pack.label;
+        document.getElementById('vehTitle').textContent = 'Pick one';
+        document.getElementById('vehNote').textContent = 'Tap any of the four. It rides your GPS until you pick another.';
+        host.innerHTML = '<div class="veh-grid">' + pack.items.map(it =>
+          `<button type="button" class="tile${cur===it.id?' selected':''}" data-vehicle="${it.id}"><img src="${it.url}" width="80" height="96" alt=""><span class="t">${it.label}</span><span class="d">${it.desc}</span></button>`
+        ).join('') + '</div>';
+        host.querySelectorAll('[data-vehicle]').forEach(btn => btn.onclick = () => {
+          lsWrite(LS_VEH, btn.getAttribute('data-vehicle'));
+          applyVehMarker();
+          refreshVehBtn();
+          renderVehSheet();
+          toast('MARKER SET · ' + (findVeh(btn.getAttribute('data-vehicle'))||{}).label);
+        });
+        return;
+      }
+      back.classList.remove('show');
+      document.getElementById('vehKicker').textContent = 'YOUR MARKER';
+      document.getElementById('vehTitle').textContent = 'Choose a form';
+      document.getElementById('vehNote').textContent = 'Tap a pack — its four markers pop up. Tap one and it stays on your GPS path.';
+      host.innerHTML = '<div class="veh-grid">' + VEH_SECTIONS.map(sec => {
+        const thumbs = sec.items.map(it => `<img src="${it.url}" alt="">`).join('');
+        return `<button type="button" class="tile" data-pack="${sec.id}"><div style="display:flex;gap:4px;height:44px;align-items:flex-end;overflow:hidden">${thumbs}</div><span class="t">${sec.label}</span><span class="d">${sec.desc} · 4 markers</span></button>`;
+      }).join('') + '</div>';
+      host.querySelectorAll('[data-pack]').forEach(btn => btn.onclick = () => { S.vehView = btn.getAttribute('data-pack'); renderVehSheet(); });
+    }
+    function pruneIntel(list) {
+      const now = Date.now();
+      return (list||[]).filter(i => i && (now - i.ts) < INTEL_TTL);
+    }
+    function renderIntelMarkers() {
+      intelLayer.clearLayers();
+      pruneIntel(lsRead(LS_INTEL, [])).forEach(i => {
+        const spec = INTEL_TYPES[i.type] || {};
+        const icon = spec.photo ? L.icon({ iconUrl: spec.photo, iconSize:[48,48], iconAnchor:[24,46] }) : undefined;
+        const mk = L.marker([i.lat, i.lon], icon ? { icon, title: i.label } : { title: i.label });
+        const pop = document.createElement('div');
+        const lab = document.createElement('div'); lab.textContent = i.label;
+        pop.appendChild(lab);
+        if (i.note) { const n = document.createElement('div'); n.style.marginTop='6px'; n.style.color='#9ad'; n.textContent = i.note; pop.appendChild(n); }
+        const del = document.createElement('button');
+        del.textContent = 'DELETE'; del.style.marginTop='8px';
+        del.onclick = () => {
+          lsWrite(LS_INTEL, pruneIntel(lsRead(LS_INTEL,[])).filter(x => x.id !== i.id));
+          renderIntelMarkers();
+          toast('INTEL DELETED');
+        };
+        pop.appendChild(del);
+        mk.bindPopup(pop);
+        mk.addTo(intelLayer);
+      });
+    }
+    function openIntel() {
+      S.intelPick = { type:null, subtype:null };
+      document.getElementById('intelNote').value = '';
+      document.getElementById('postIntel').hidden = true;
+      document.getElementById('intelSubs').innerHTML = '';
+      const grid = document.getElementById('intelGrid');
+      grid.innerHTML = Object.keys(INTEL_TYPES).map(k => {
+        const t = INTEL_TYPES[k];
+        return `<button type="button" class="tile" data-type="${k}"><img src="${t.photo}" width="80" height="56" alt=""><span class="t">${t.label}</span><span class="d">${t.desc}</span></button>`;
+      }).join('');
+      grid.querySelectorAll('[data-type]').forEach(btn => btn.onclick = () => pickIntel(btn.getAttribute('data-type')));
+      document.getElementById('intelSheet').classList.add('open');
+    }
+    function pickIntel(type) {
+      S.intelPick = { type, subtype:null };
+      document.querySelectorAll('#intelGrid .tile').forEach(t => t.classList.toggle('selected', t.getAttribute('data-type')===type));
+      const spec = INTEL_TYPES[type];
+      const row = document.getElementById('intelSubs');
+      const post = document.getElementById('postIntel');
+      if (spec.subtypes.length) {
+        row.innerHTML = spec.subtypes.map(s => `<button type="button" class="chip-btn" data-sub="${s.id}">${s.label}</button>`).join('');
+        row.querySelectorAll('.chip-btn').forEach(b => b.onclick = () => {
+          row.querySelectorAll('.chip-btn').forEach(c => c.classList.remove('active'));
+          b.classList.add('active');
+          S.intelPick.subtype = b.getAttribute('data-sub');
+          post.hidden = false;
+        });
+        post.hidden = true;
+      } else {
+        row.innerHTML = '';
+        post.hidden = false;
+      }
+    }
+    function postIntel() {
+      if (!S.intelPick || !S.intelPick.type) return;
+      const spec = INTEL_TYPES[S.intelPick.type];
+      let lat, lon, source;
+      if (S.gps && S.coords) { lat = S.coords.lat; lon = S.coords.lon; source = 'gps'; }
+      else { const c = map.getCenter(); lat = c.lat; lon = c.lng; source = 'map'; }
+      const item = {
+        id: 'i'+Date.now(),
+        type: S.intelPick.type,
+        subtype: S.intelPick.subtype,
+        label: spec.label + (S.intelPick.subtype ? ' · ' + S.intelPick.subtype.replace(/_/g,' ').toUpperCase() : ''),
+        note: (document.getElementById('intelNote').value||'').trim().slice(0,140),
+        color: spec.color,
+        lat, lon, source, ts: Date.now()
+      };
+      const all = pruneIntel(lsRead(LS_INTEL, []));
+      all.unshift(item);
+      lsWrite(LS_INTEL, all.slice(0,40));
+      renderIntelMarkers();
+      document.getElementById('intelSheet').classList.remove('open');
+      toast('INTEL POSTED · ' + item.label);
+      switchScreen('map');
+    }
+    document.getElementById('btnMarker').onclick = () => { S.vehView = null; renderVehSheet(); document.getElementById('vehSheet').classList.add('open'); };
+    document.getElementById('btnReport').onclick = openIntel;
+    document.getElementById('closeVeh').onclick = () => document.getElementById('vehSheet').classList.remove('open');
+    document.getElementById('closeIntel').onclick = () => document.getElementById('intelSheet').classList.remove('open');
+    document.getElementById('vehBack').onclick = () => { S.vehView = null; renderVehSheet(); };
+    document.getElementById('postIntel').onclick = postIntel;
+    document.getElementById('clearIntel').onclick = () => { lsWrite(LS_INTEL, []); renderIntelMarkers(); toast('INTEL CLEARED'); };
     let qTimer, spHits = [];
     document.getElementById('hits').addEventListener('click', (e) => {
       const el = e.target.closest('.hit');
@@ -417,7 +703,17 @@
         ]);
         const per = h.properties.periods[0];
         S.hourly = { temperature: per.temperature+'°'+per.temperatureUnit, wind: (per.windDirection||'')+' '+(per.windSpeed||''), humidity: (per.relativeHumidity&&per.relativeHumidity.value!=null)? per.relativeHumidity.value+'%':'N/A' };
-        S.alerts = (a.features||[]).map(f=>({ event:f.properties.event, severity:f.properties.severity, urgency:f.properties.urgency }));
+        S.hours = (h.properties.periods||[]).slice(0,8).map(p => ({
+          when: new Date(p.startTime).toLocaleTimeString([], { hour:'numeric' }),
+          temp: p.temperature+'°',
+          wind: p.windSpeed || ''
+        }));
+        S.alerts = (a.features||[]).map(f => {
+          const pr = f.properties || {};
+          let expires = '';
+          try { if (pr.expires) expires = new Date(pr.expires).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }); } catch (e) {}
+          return { event: pr.event, severity: pr.severity, urgency: pr.urgency, headline: pr.headline, area: pr.areaDesc, expires };
+        });
         S.last = live ? evaluate(S.alerts) : S.last;
         S.wx = !!live;
       } catch (e) { if (live) S.wx = false; }
@@ -432,8 +728,15 @@
     async function onFix(lat, lon, speed) {
       S.gps = true; S.coords = { lat, lon };
       if (speed!=null && isFinite(speed)) S.speed = speed;
-      if (!marker) marker = L.circleMarker([lat,lon], { radius:8, color:'#00E5FF', fillColor:'#00E5FF', fillOpacity:.95 }).addTo(map);
-      else marker.setLatLng([lat,lon]);
+      if (!marker) {
+        const ic = vehIcon();
+        marker = ic
+          ? L.marker([lat,lon], { icon: ic }).addTo(map)
+          : L.circleMarker([lat,lon], { radius:8, color:'#00E5FF', fillColor:'#00E5FF', fillOpacity:.95 }).addTo(map);
+      } else {
+        marker.setLatLng([lat,lon]);
+        applyVehMarker();
+      }
       map.setView([lat,lon], 14);
       await loadAtmosphere(lat, lon, true);
       if (S.dest) await startDrive(S.dest);
@@ -475,6 +778,8 @@
     if (window.visualViewport) window.visualViewport.addEventListener('resize', kickMap);
     paint();
     applyView(VIEW.lat, VIEW.lon, 'murphysboro');
+    renderIntelMarkers();
+    refreshVehBtn();
     setTimeout(kickMap, 200);
     requestGps();
   </script>
