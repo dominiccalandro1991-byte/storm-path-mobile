@@ -109,6 +109,58 @@ extra.push({
     detail: 'docs/index.html iPhone map fill + GPS gate',
   });
   extra.push({
+    id: 'HUD_PAGES_MARKER',
+    vector: 'hud',
+    weight: 6,
+    ok:
+      hud.indexOf('Choose a form') >= 0 &&
+      hud.indexOf('vehicles/twister.png') >= 0 &&
+      hud.indexOf('sp.vehicle.v1') >= 0 &&
+      exists('docs/vehicles/twister.png') &&
+      exists('docs/vehicles/blaze.png'),
+    detail: 'MARKER packs + vehicle PNGs',
+  });
+  extra.push({
+    id: 'HUD_PAGES_INTEL',
+    vector: 'hud',
+    weight: 6,
+    ok:
+      hud.indexOf('DRIVER INTEL') >= 0 &&
+      hud.indexOf('POST INTEL') >= 0 &&
+      hud.indexOf('sp.intel.v1') >= 0 &&
+      exists('docs/intel/unit.png') &&
+      exists('docs/intel/collision.png'),
+    detail: 'REPORT sheet + intel PNGs + 3h TTL store',
+  });
+  extra.push({
+    id: 'HUD_PAGES_NWS_CARDS',
+    vector: 'hud',
+    weight: 4,
+    ok: hud.indexOf('NWS ALERTS') >= 0 && hud.indexOf('headline') >= 0 && hud.indexOf('api.weather.gov/alerts/active') >= 0,
+    detail: 'NWS headline cards from alerts/active',
+  });
+  extra.push({
+    id: 'HUD_SIX_SOURCE_CHIPS',
+    vector: 'hud',
+    weight: 3,
+    ok: hud.indexOf('DOT') >= 0 && hud.indexOf('EMERG MGMT') >= 0 && hud.indexOf('SHELTERS') >= 0,
+    detail: 'NOAA NWS DOT EMERG ROAD SHELTERS chips',
+  });
+  extra.push({
+    id: 'NATIVE_MAP_MARKER',
+    vector: 'hud',
+    weight: 6,
+    ok: read('src/screens/MapScreen.tsx').indexOf('VORTEX') >= 0 || read('src/screens/MapScreen.tsx').indexOf('Choose a form') >= 0,
+    detail: 'native MapScreen marker packs',
+  });
+  extra.push({
+    id: 'NATIVE_MAP_INTEL',
+    vector: 'hud',
+    weight: 6,
+    ok: read('src/screens/MapScreen.tsx').indexOf('POST INTEL') >= 0 || read('src/screens/MapScreen.tsx').indexOf('DRIVER INTEL') >= 0,
+    detail: 'native MapScreen driver intel board',
+  });
+  extra.push({
     id: 'README_ORG_URL',
     vector: 'github',
     weight: 3,
@@ -139,6 +191,9 @@ async function withRuntime(): Promise<void> {
       32,
     ),
     runtimeProbe('RUNTIME_OSM_TILE', 6, 'https://tile.openstreetmap.org/13/2075/3104.png', 'StormPath-Mobile/1.0.0', 32),
+    runtimeProbe('RUNTIME_PAGES_HUD', 8, 'https://voltcore-org.github.io/storm-path-mobile/', 'StormPath-Mobile/1.0.0', 10000),
+    runtimeProbe('RUNTIME_VEH_PNG', 4, 'https://voltcore-org.github.io/storm-path-mobile/vehicles/twister.png', 'StormPath-Mobile/1.0.0', 1024),
+    runtimeProbe('RUNTIME_INTEL_PNG', 4, 'https://voltcore-org.github.io/storm-path-mobile/intel/unit.png', 'StormPath-Mobile/1.0.0', 1024),
   ]);
   extra.push(...probes);
   const report = scoreVector(extra);
