@@ -41,6 +41,7 @@ import {
   spHwMarkGpsFail,
   spHwMarkPermission,
 } from '../diagnostics/spHardwareLog';
+import { reportStormPathFlags } from '../telemetry';
 
 export type SpeedUnits = 'MPH' | 'KMH';
 
@@ -389,6 +390,15 @@ export function StormPathProvider({ children }: { children: React.ReactNode }): 
     flagsRef.current.coords = coords;
     flagsRef.current.destination = destination;
   }, [coords, destination, gpsAvailable, lastAlertState, liveSources, radarOK, startupSafe, weatherOK]);
+
+  useEffect(() => {
+    reportStormPathFlags({
+      weatherOK,
+      radarOK,
+      gpsAvailable,
+      accuracyMeters: coords && typeof coords.accuracy === 'number' ? coords.accuracy : null,
+    });
+  }, [coords, gpsAvailable, radarOK, weatherOK]);
 
   useEffect(() => {
     const golden = runGoldenInvariantChecks();

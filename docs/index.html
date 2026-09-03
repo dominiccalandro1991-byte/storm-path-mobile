@@ -242,5 +242,48 @@
     setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:false}); }, 1000);
     paint();
   </script>
+
+  <script>
+  (function(){
+    var SRC="storm-path-mobile";
+    var URL="https://core-api.dominic-calandro1991.workers.dev/api/v1/events";
+    var NWS="https://api.weather.gov/alerts/active/count";
+    var RADAR="https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&version=1.1.1&request=GetMap&layers=conus_bref_qcd&format=image/png&transparent=true&srs=CRS:84&bbox=-90,37,-88,39&width=64&height=64";
+    var frames=0,last=performance.now(),fps=0,gpsAccuracy=0,gpsState="unavailable",nwsOk=false,radarOk=false;
+    function tick(t){frames++;if(t-last>=1000){fps=frames;frames=0;last=t;}requestAnimationFrame(tick);}
+    requestAnimationFrame(tick);
+    function emit(type,severity,payload){
+      try{fetch(URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:SRC,type:type,severity:severity,payload:payload||{}}),keepalive:true}).catch(function(){});}catch(e){}
+    }
+    function quality(m){if(typeof m!=="number"||!isFinite(m)||m<0)return 0;return Math.max(0,Math.min(1,1-(m-5)/50));}
+    function sampleGps(){
+      if(!navigator.geolocation){gpsState="unsupported";gpsAccuracy=0;return;}
+      try{
+        navigator.geolocation.getCurrentPosition(function(pos){
+          gpsAccuracy=quality(pos&&pos.coords?pos.coords.accuracy:NaN);gpsState="fix";
+        },function(err){gpsAccuracy=0;gpsState=err&&err.code===1?"denied":"unavailable";},{enableHighAccuracy:true,maximumAge:30000,timeout:8000});
+      }catch(e){gpsState="unavailable";gpsAccuracy=0;}
+    }
+    function probeNws(){
+      var c=typeof AbortController!=="undefined"?new AbortController():null;
+      var t=c?setTimeout(function(){c.abort();},8000):null;
+      fetch(NWS,{headers:{Accept:"application/ld+json","User-Agent":"StormPath-Mobile/1.0 (voltcore-org telemetry)"},signal:c?c.signal:undefined})
+        .then(function(r){nwsOk=!!r.ok;}).catch(function(){nwsOk=false;}).then(function(){if(t)clearTimeout(t);});
+    }
+    function probeRadar(){
+      var c=typeof AbortController!=="undefined"?new AbortController():null;
+      var t=c?setTimeout(function(){c.abort();},10000):null;
+      fetch(RADAR,{signal:c?c.signal:undefined}).then(function(r){if(!r.ok){radarOk=false;return null;}return r.arrayBuffer();})
+        .then(function(b){if(b)radarOk=b.byteLength>32;}).catch(function(){radarOk=false;}).then(function(){if(t)clearTimeout(t);});
+    }
+    function health(){
+      return {status:"live",surface:"mobile-web",gps_accuracy:gpsAccuracy,gps_state:gpsState,nws_radar_status:radarOk,weather_api_health:nwsOk,frame_rate:fps};
+    }
+    sampleGps();probeNws();probeRadar();
+    setTimeout(function(){emit("app.event","info",health());},1600);
+    setInterval(function(){sampleGps();probeNws();probeRadar();setTimeout(function(){emit("health.heartbeat","info",health());},1600);},30000);
+  })();
+  </script>
 </body>
+
 </html>
