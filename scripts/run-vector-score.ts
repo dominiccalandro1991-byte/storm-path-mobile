@@ -43,7 +43,7 @@ function fileCheck(id: string, vector: VectorCheck['vector'], weight: number, re
 
 const extra: VectorCheck[] = [
   fileCheck('HUD_DRIVER', 'hud', 5, 'src/screens/DriverScreen.tsx', ['TIME TO ARRIVE', 'START DRIVE', 'CONFIDENCE']),
-  fileCheck('HUD_MAP', 'hud', 5, 'src/screens/MapScreen.tsx', ['UrlTile', 'Polyline', 'Overlay']),
+  fileCheck('HUD_MAP', 'hud', 5, 'src/screens/MapScreen.tsx', ['UrlTile', 'Polyline', 'Overlay', 'tile.openstreetmap.org', 'Murphysboro']),
   fileCheck('HUD_WEATHER', 'hud', 4, 'src/screens/WeatherScreen.tsx', ['LIVE NWS ALERTS', 'RADAR']),
   fileCheck('HUD_SETTINGS', 'hud', 3, 'src/screens/SettingsScreen.tsx', ['Speed units', 'AND-GATE']),
   fileCheck('HUD_SEARCH', 'hud', 4, 'src/ui/SearchSheet.tsx', ['Set destination', 'START DRIVE']),
@@ -57,7 +57,7 @@ const extra: VectorCheck[] = [
   fileCheck('STORE_PRIVACY', 'store', 3, 'docs/privacy.html', ['Location', 'National Weather Service']),
   fileCheck('GITHUB_CI', 'github', 4, '.github/workflows/mobile-ci.yml', ['test:golden', 'test:vector']),
   fileCheck('GITHUB_PAGES', 'github', 3, '.github/workflows/pages.yml', ['deploy-pages', 'docs']),
-  fileCheck('GITHUB_TEST_HUD', 'github', 4, 'docs/index.html', ['STORMPATH', 'spComputeNextState', 'api.weather.gov']),
+  fileCheck('GITHUB_TEST_HUD', 'github', 4, 'docs/index.html', ['STORMPATH', 'spComputeNextState', 'api.weather.gov', '37.7645', 'get.geojs.io']),
   fileCheck('ISOLATION_NO_WEB_HTML', 'github', 3, 'package.json', ['storm-path-mobile']),
 ];
 
