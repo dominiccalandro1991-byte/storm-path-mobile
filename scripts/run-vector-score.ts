@@ -326,8 +326,35 @@ extra.push({
           },
         ],
       });
+      const poi = fromArcgisBody({
+        candidates: [
+          {
+            score: 100,
+            address: 'Walgreens',
+            location: { x: -89.3297, y: 37.7635 },
+            attributes: {
+              Addr_type: 'POI',
+              Match_addr: 'Walgreens',
+              PlaceName: 'Walgreens',
+              StAddr: '503 Walnut St',
+              Place_addr: '503 Walnut St, Murphysboro, Illinois, 62966',
+              City: 'Murphysboro',
+              Region: 'Illinois',
+              Postal: '62966',
+            },
+          },
+        ],
+      });
       const merged = spMergeGeoHits([census, arc], 10);
-      return census.length === 1 && arc.length === 1 && merged.length === 1 && census[0].rank === 0;
+      return (
+        census.length === 1 &&
+        arc.length === 1 &&
+        merged.length === 1 &&
+        census[0].rank === 0 &&
+        poi.length === 1 &&
+        poi[0].label === 'Walgreens' &&
+        poi[0].sub.indexOf('503 Walnut St') >= 0
+      );
     })(),
     detail: 'Census MAF + ArcGIS PointAddress parsers',
   });
@@ -338,7 +365,8 @@ extra.push({
     ok:
       hud.indexOf('geocode.arcgis.com') >= 0 &&
       hud.indexOf('nominatim.openstreetmap.org') >= 0 &&
-      hud.indexOf('function searchUS') >= 0 &&
+      hud.indexOf('StAddr') >= 0 &&
+      hud.indexOf('LongLabel') >= 0 &&
       hud.indexOf('photon.komoot.io') >= 0 &&
       hud.indexOf('camFollowPan') >= 0 &&
       hud.indexOf('api.rainviewer.com') >= 0,

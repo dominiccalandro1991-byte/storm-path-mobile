@@ -722,8 +722,14 @@
     function uniquePlaces(list) {
       const out = [];
       list.forEach((p) => {
-        const dup = out.some((q) => Math.abs(q.lat - p.lat) < 0.0003 && Math.abs(q.lon - p.lon) < 0.0003);
-        if (!dup) out.push(p);
+        const idx = out.findIndex((q) => Math.abs(q.lat - p.lat) < 0.0015 && Math.abs(q.lon - p.lon) < 0.0015);
+        const pStreet = /\d/.test((p.label||'') + (p.sub||''));
+        if (idx >= 0) {
+          const qStreet = /\d/.test((out[idx].label||'') + (out[idx].sub||''));
+          if (pStreet && !qStreet) out[idx] = p;
+          return;
+        }
+        out.push(p);
       });
       return out;
     }
@@ -758,12 +764,25 @@
         const place = attr.PlaceName || '';
         const city = attr.City || '';
         const region = attr.Region || '';
+        const regionShort = region === 'Illinois' ? 'IL' : region;
+        const postal = attr.Postal || '';
+        const street = attr.StAddr || '';
+        const placeAddr = attr.Place_addr || '';
+        const longLabel = attr.LongLabel || '';
         const match = attr.Match_addr || row.address || '';
-        const label = place && city && match.toLowerCase().indexOf(place.toLowerCase()) !== 0
-          ? place + ', ' + city + ', ' + (region || 'US')
-          : (match || place || 'US place');
+        let label = match || place || 'US place';
+        let sub = [city, regionShort].filter(Boolean).join(', ');
+        if (kind === 'POI' && place) {
+          label = place;
+          sub = street
+            ? street + ', ' + city + (regionShort ? ', ' + regionShort : '') + (postal ? ' ' + postal : '')
+            : (placeAddr || longLabel || sub);
+        } else if (longLabel) {
+          label = longLabel.replace(/, USA$/, '');
+          sub = [city, regionShort, postal].filter(Boolean).join(' ');
+        }
         const rank = (kind === 'PointAddress' || kind === 'StreetAddress') ? 0 : (kind === 'POI' ? 1 : 2);
-        return { label: label, sub: [kind, city, region].filter(Boolean).join(' · '), lat: loc.y, lon: loc.x, rank: rank, score: row.score };
+        return { label: label, sub: sub, lat: loc.y, lon: loc.x, rank: rank, score: row.score };
       }).filter(function(p){ return isFinite(p.lat) && isFinite(p.lon) && (p.score == null || p.score >= 70); });
     }
     function fromNominatimHits(body) {
@@ -779,7 +798,7 @@
     async function searchUS(q, bias) {
       const enc = encodeURIComponent(q);
       const loc = bias.lon + ',' + bias.lat;
-      const arc = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&countryCode=USA&maxLocations=8&outFields=Addr_type,Match_addr,PlaceName,City,Region,Postal&location=' + loc + '&distance=80000&SingleLine=' + enc;
+      const arc = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&countryCode=USA&maxLocations=8&outFields=Addr_type,Match_addr,LongLabel,PlaceName,StAddr,Place_addr,City,Region,Postal&location=' + loc + '&distance=80000&SingleLine=' + enc;
       const nom = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=1&limit=8&q=' + enc;
       const pho = 'https://photon.komoot.io/api/?q=' + enc + '&lat=' + bias.lat + '&lon=' + bias.lon + '&limit=10&lang=en';
       const [a, n, p] = await Promise.all([
@@ -788,8 +807,17 @@
         fetch(pho).then(function(r){ return r.json(); }).catch(function(){ return null; })
       ]);
       const photonHits = ((p && p.features) || []).filter(function(f){ return f && f.geometry && f.geometry.coordinates; }).map(formatPhoton).map(function(h){ h.rank = /\d/.test(h.label) ? 0 : 2; return h; });
-      const merged = [].concat(fromArcgis(a), fromNominatimHits(n), photonHits).sort(function(x,y){ return (x.rank||2) - (y.rank||2); });
-      return uniquePlaces(merged).slice(0, 10);
+      const merged = uniquePlaces([].concat(fromArcgis(a), fromNominatimHits(n), photonHits));
+      merged.forEach(function(h){
+        const m = metersBetween(bias, { lat: h.lat, lon: h.lon });
+        const miles = m / 1609.34;
+        const dist = miles < 0.1 ? Math.round(m * 3.28084) + ' ft' : ((miles < 10 ? miles.toFixed(1) : Math.round(miles)) + ' mi');
+        if (h.sub && h.sub.indexOf(' mi') < 0 && h.sub.indexOf(' ft') < 0) h.sub = h.sub + ' · ' + dist;
+        else if (!h.sub) h.sub = dist;
+        h._m = m;
+      });
+      merged.sort(function(x,y){ return (x._m||0) - (y._m||0); });
+      return merged.slice(0, 8);
     }
     document.getElementById('q').addEventListener('input', (e)=>{
       clearTimeout(qTimer);
@@ -805,7 +833,7 @@
           return;
         }
         document.getElementById('hits').innerHTML = spHits.map((h,i)=>`<div class="hit" data-i="${i}"><b>${spEsc(h.label)}</b><div class="muted">${spEsc(h.sub || h.lat.toFixed(4)+', '+h.lon.toFixed(4))}</div></div>`).join('');
-        setPending(null);
+        setPending(spHits[0] || null);
       }, 280);
     });
     async function startDrive(place) {

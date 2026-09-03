@@ -1,4 +1,4 @@
-import { fromArcgisBody, fromCensusBody, spMergeGeoHits, type SpGeoHit } from '../core/spGeoParse';
+import { fromArcgisBody, fromCensusBody, spAnnotateDistance, spMergeGeoHits, type SpGeoHit } from '../core/spGeoParse';
 import { SP_MAP_VIEW_DEFAULT, spIsFiniteNumber, spIsPlainObject } from '../core/spTypes';
 
 export type SpPlace = {
@@ -173,7 +173,7 @@ export async function searchPlaces(query: string, bias?: SpGeoBias | null): Prom
   const nomUrl = `${SP_NOMINATIM}?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=1&limit=8&q=${enc}`;
   const omUrl = `${SP_OPENMETEO}?name=${enc}&count=8&language=en&format=json&countryCode=US`;
   const censusUrl = `${SP_CENSUS}?address=${enc}&benchmark=Public_AR_Current&format=json`;
-  const arcUrl = `${SP_ARCGIS}?f=json&countryCode=USA&maxLocations=8&outFields=Addr_type,Match_addr,PlaceName,City,Region,Postal&location=${b.longitude},${b.latitude}&distance=80000&SingleLine=${enc}`;
+  const arcUrl = `${SP_ARCGIS}?f=json&countryCode=USA&maxLocations=8&outFields=Addr_type,Match_addr,LongLabel,PlaceName,StAddr,Place_addr,City,Region,Postal&location=${b.longitude},${b.latitude}&distance=80000&SingleLine=${enc}`;
 
   const [photon, nominatim, openMeteo, census, arcgis] = await Promise.all([
     fetchJson(photonUrl, { Accept: 'application/json' }, 8000).catch(() => null),
@@ -192,9 +192,10 @@ export async function searchPlaces(query: string, bias?: SpGeoBias | null): Prom
     rank: /\d/.test(p.label) ? 0 : 2,
   }));
   const omHits: SpGeoHit[] = fromOpenMeteo(openMeteo).map((p) => ({ ...p, rank: 3 }));
-  const merged = spMergeGeoHits(
-    [fromCensusBody(census), fromArcgisBody(arcgis), photonHits, nomHits, omHits],
-    10,
+  const merged = spAnnotateDistance(
+    spMergeGeoHits([fromCensusBody(census), fromArcgisBody(arcgis), photonHits, nomHits, omHits], 10),
+    b.latitude,
+    b.longitude,
   );
   return merged.map(toPlace);
 }
