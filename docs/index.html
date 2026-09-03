@@ -45,6 +45,8 @@
     .cell { flex:1; border:1px solid var(--border); border-radius:8px; text-align:center; padding:10px 0; }
     .cell b { display:block; font-size:22px; }
     .cell span { color:var(--dim); font-size:10px; letter-spacing:1px; }
+  
+    #map .sp-base-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.88) contrast(0.92); }
   </style>
 </head>
 <body>
@@ -125,7 +127,7 @@
     }
     const S = { screen:'map', gps:false, wx:false, radar:false, last:null, coords:null, dest:null, route:null, hourly:null, alerts:[], radarUrl:null };
     const map = L.map('map', { zoomControl:false }).setView([VIEW.lat, VIEW.lon], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19, attribution:'OSM CARTO' }).addTo(map);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap', className:'sp-base-tiles' }).addTo(map);
     let marker = null, destMark = null, line = null, radarLayer = null;
     function setDot(el, ok) { el.style.background = ok ? 'var(--green)' : 'var(--amber)'; }
     function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2400); }

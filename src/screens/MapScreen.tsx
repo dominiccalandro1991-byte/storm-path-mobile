@@ -5,7 +5,7 @@ import { SP_COLOR } from '../theme';
 import { formatSpeed, useStormPath } from '../state/StormPathStore';
 import { radarBoundsFromFix } from '../net/spRadar';
 
-const CARTO_DARK = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png';
+const OSM_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 export function MapScreen(): React.ReactElement {
   const { snapshot, markMapLayout, mapViewDefault, setSearchOpen, requestGps } = useStormPath();
@@ -52,7 +52,7 @@ export function MapScreen(): React.ReactElement {
         region={region}
         rotateEnabled={false}
       >
-        <UrlTile urlTemplate={CARTO_DARK} maximumZ={19} tileSize={256} />
+        <UrlTile urlTemplate={OSM_TILE} maximumZ={19} tileSize={256} />
         {snapshot.coords ? (
           <Marker
             coordinate={{
